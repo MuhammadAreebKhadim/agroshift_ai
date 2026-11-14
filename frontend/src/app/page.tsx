@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
+import StructuredChatContent from "@/components/StructuredChatContent";
 import dynamic from "next/dynamic";
 import { 
   Sprout,
@@ -576,6 +577,7 @@ interface DynamicStratCard {
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [simMode, setSimMode] = useState<"location" | "portfolio">("location");
   const [isSimPending, startSimTransition] = useTransition();
+  const [stressRate, setStressRate] = useState<number>(7);
 
   // Chatbot states (Open-ended AgriAI)
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
@@ -1094,23 +1096,41 @@ interface DynamicStratCard {
         { month: "Dec", temp: 14.5, rain: 9.8, radiation: 11.6, baselineTrend: 12.0 },
       ];
 
-  // Image 2 style: Climate Risk Yield Impact (%)
-  const yieldImpactData = [
-    { decade: "2020s", traditional: -0.4, resilient: -0.8 },
-    { decade: "2030s", traditional: -1.3, resilient: -0.5 },
-    { decade: "2040s", traditional: -2.2, resilient: -0.7 },
-    { decade: "2050s", traditional: -6.2, resilient: -1.9 },
-    { decade: "2060s", traditional: -16.0, resilient: -7.5 },
-  ];
+  // Dynamic Stress Coupling - Reacts to Rainfall, Temperature, Irrigation, and Stress Rate
+  const stressIndex = useMemo(() => {
+    return (
+      (Math.abs(Math.min(0, simRain)) / 20.0) * 0.35 +
+      (simTemp / 2.0) * 0.40 +
+      (Math.abs(simWater) / 30.0) * 0.45 +
+      (stressRate / 20.0) * 0.20
+    );
+  }, [simRain, simTemp, simWater, stressRate]);
 
-  // Image 2 style: Total Projected Yield (kg/ha)
-  const projectedYieldData = [
-    { decade: "2020s", traditional: 16950, resilient: 19400 },
-    { decade: "2030s", traditional: 16800, resilient: 19450 },
-    { decade: "2040s", traditional: 16650, resilient: 19400 },
-    { decade: "2050s", traditional: 15950, resilient: 19180 },
-    { decade: "2060s", traditional: 14280, resilient: 18050 },
-  ];
+  const traditionalLoss2060 = useMemo(() => {
+    return Math.round(16.0 * stressIndex * 10) / 10;
+  }, [stressIndex]);
+
+  const resilientLoss2060 = useMemo(() => {
+    return Math.round(7.5 * Math.min(1.4, stressIndex) * 10) / 10;
+  }, [stressIndex]);
+
+  const yieldImpactData = useMemo(() => [
+    { decade: "2020s", traditional: 0, resilient: 0 },
+    { decade: "2030s", traditional: -Number((2.5 * stressIndex).toFixed(1)), resilient: -Number((0.8 * stressIndex).toFixed(1)) },
+    { decade: "2040s", traditional: -Number((6.0 * stressIndex).toFixed(1)), resilient: -Number((2.2 * stressIndex).toFixed(1)) },
+    { decade: "2050s", traditional: -Number((11.5 * stressIndex).toFixed(1)), resilient: -Number((4.5 * stressIndex).toFixed(1)) },
+    { decade: "2060s", traditional: -traditionalLoss2060, resilient: -resilientLoss2060 },
+  ], [stressIndex, traditionalLoss2060, resilientLoss2060]);
+
+  const baseResKg = 19500;
+  const baseTradKg = 17000;
+  const projectedYieldData = useMemo(() => [
+    { decade: "2020s", traditional: baseTradKg, resilient: baseResKg },
+    { decade: "2030s", traditional: Math.round(baseTradKg * (1 - (2.5 * stressIndex) / 100)), resilient: Math.round(baseResKg * (1 - (0.8 * stressIndex) / 100)) },
+    { decade: "2040s", traditional: Math.round(baseTradKg * (1 - (6.0 * stressIndex) / 100)), resilient: Math.round(baseResKg * (1 - (2.2 * stressIndex) / 100)) },
+    { decade: "2050s", traditional: Math.round(baseTradKg * (1 - (11.5 * stressIndex) / 100)), resilient: Math.round(baseResKg * (1 - (4.5 * stressIndex) / 100)) },
+    { decade: "2060s", traditional: Math.round(baseTradKg * (1 - traditionalLoss2060 / 100)), resilient: Math.round(baseResKg * (1 - resilientLoss2060 / 100)) },
+  ], [stressIndex, traditionalLoss2060, resilientLoss2060]);
 
   // Dynamic Multi-Field Rotation Matrix - Retrieves Real User Registration & Parcel Data
   const defaultWholeFarmField: FieldParcel = {
@@ -1122,7 +1142,9 @@ interface DynamicStratCard {
     ...getRotationForCrop(currentCrop, soilType, Number(soilPh))
   };
 
-  const dynamicStrategies = computeDynamicStrategies(currentCrop, soilType, Number(soilPh), priority, irrigationType);
+  const dominantCrop = registeredFields.length > 0 ? registeredFields[0].y2026 : currentCrop;
+  const effectiveBaseCrop = dominantCrop;
+  const dynamicStrategies = computeDynamicStrategies(effectiveBaseCrop, soilType, Number(soilPh), priority, irrigationType);
   const topEvaluatedStrategy = dynamicStrategies.reduce((best, cur) => (cur.overallScore > best.overallScore ? cur : best), dynamicStrategies[0]);
 
   const getActionStepsForCrop = (crop: string, soil: string, ph: number, pri: string): string[] => {
@@ -1164,8 +1186,6 @@ interface DynamicStratCard {
   const totalFarmAcres = registeredFields.length > 0 
     ? registeredFields.reduce((sum, f) => sum + f.acres, 0) 
     : (Number(area) > 0 ? Number(area) : 30);
-
-  const dominantCrop = registeredFields.length > 0 ? registeredFields[0].y2026 : currentCrop;
 
   const activeFields: FieldParcel[] = registeredFields.length > 0 
     ? registeredFields 
@@ -1630,7 +1650,7 @@ interface DynamicStratCard {
                               <td className="px-3"><span className="px-2 py-0.5 rounded bg-slate-100 font-bold">{f.y2026}</span></td>
                               <td className="px-3 font-bold text-emerald-700">{f.y2027 || dynRot.y2027}</td>
                               <td className="px-3 font-bold text-blue-700">{f.y2028 || dynRot.y2028}</td>
-                              <td className="px-3 text-right font-black text-slate-900">{dynRot.score}/100</td>
+                              <td className="px-3 text-right font-black text-slate-900">{topEvaluatedStrategy.overallScore}/100</td>
                             </tr>
                           );
                         })}
@@ -2436,16 +2456,16 @@ interface DynamicStratCard {
                             </select>
                           </td>
                           <td className="px-3">
-                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${dynamicFieldRot.color}`}>
-                              {dynamicFieldRot.strategy}
+                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${topEvaluatedStrategy.badgeBg} ${topEvaluatedStrategy.badgeText}`}>
+                              {topEvaluatedStrategy.name}
                             </span>
                           </td>
                           <td className="px-3">
-                            <span className="text-[11px] font-semibold text-slate-600 max-w-[200px] truncate block" title={dynamicFieldRot.category}>
-                              {dynamicFieldRot.category}
+                            <span className="text-[11px] font-semibold text-slate-600 max-w-[200px] truncate block" title={topEvaluatedStrategy.focusPoints[0] || dynamicFieldRot.category}>
+                              {topEvaluatedStrategy.focusPoints[0] || dynamicFieldRot.category}
                             </span>
                           </td>
-                          <td className="px-3 text-right font-black text-slate-900">{dynamicFieldRot.score}/100</td>
+                          <td className="px-3 text-right font-black text-slate-900">{topEvaluatedStrategy.overallScore}/100</td>
                         </tr>
                       );
                     })}
@@ -2696,12 +2716,19 @@ interface DynamicStratCard {
               <div>
                 <label className="block font-bold text-slate-700 mb-1 flex justify-between">
                   <span>Discount / Stress Rate</span>
-                  <span className="text-blue-700 font-black">7%</span>
+                  <span className="text-blue-700 font-black">{stressRate}%</span>
                 </label>
-                <input type="range" min="0" max="25" defaultValue="7" className="w-full accent-blue-600 cursor-pointer" />
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="25" 
+                  value={stressRate} 
+                  onChange={(e) => setStressRate(Number(e.target.value))}
+                  className="w-full accent-blue-600 cursor-pointer" 
+                />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>0%</span>
-                  <span>7%</span>
+                  <span>{stressRate}%</span>
                   <span>25%</span>
                 </div>
               </div>
@@ -2871,6 +2898,119 @@ interface DynamicStratCard {
               {/* RIGHT MAIN CONTENT: Comparative Charts & Recalculated Score Table (lg:col-span-8) */}
               <div className="lg:col-span-8 space-y-6">
                 
+                {/* FUTURE RISKS & DANGEROUS CLIMATE SITUATIONS (User Explicit Request) */}
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                      Future Risks & Dangerous Climate Situations Identified
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                      stressIndex >= 1.5 
+                        ? "bg-rose-600 text-white border-rose-700 animate-pulse shadow-sm" 
+                        : stressIndex >= 0.8 
+                          ? "bg-amber-100 text-amber-900 border-amber-300" 
+                          : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    }`}>
+                      {stressIndex >= 1.5 ? "Critical Climate Danger Zone" : stressIndex >= 0.8 ? "High Climate Hazard Warning" : "Baseline Stable Conditions"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Danger 1: Thermal Sterility */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Crop Heat Blast Risk</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                          simTemp >= 3.5 ? 'bg-rose-600 text-white' : (simTemp >= 2.0 ? 'bg-rose-100 text-rose-700' : (simTemp >= 1.0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'))
+                        }`}>
+                          {simTemp >= 3.5 ? 'Extreme Critical Danger' : (simTemp >= 2.0 ? 'High Risk' : (simTemp >= 1.0 ? 'Caution Warning' : 'Safe / Baseline'))}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-rose-500 h-1.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${Math.min(100, Math.round((simTemp / 5.0) * 100))}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        {simTemp >= 3.0 
+                          ? `Extreme thermal stress (+${simTemp.toFixed(1)}°C): Pollen sterility in summer maize exceeds 60%; cotton sheds over 40% fruiting squares.`
+                          : simTemp >= 1.5 
+                            ? `Elevated heat (+${simTemp.toFixed(1)}°C): Tmax > 38°C accelerates crop respiration, causing tassel blast and shrinking wheat grain fill.`
+                            : `Thermal regime remains within optimal physiological tolerance (+${simTemp.toFixed(1)}°C).`}
+                      </p>
+                    </div>
+
+                    {/* Danger 2: Moisture Deficit */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Root-Zone Water Deficit</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                          Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5) >= 220 
+                            ? 'bg-rose-600 text-white' 
+                            : Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5) >= 140 
+                              ? 'bg-amber-100 text-amber-900' 
+                              : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5) >= 220 
+                            ? 'Critical Drought Failure' 
+                            : Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5) >= 140 
+                              ? 'Severe Deficit' 
+                              : 'Optimal Balance'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-amber-500 h-1.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${Math.min(100, Math.round((Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5) / 300) * 100))}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Cumulative evapotranspiration deficit of -{Math.round(Math.abs(Math.min(0, simRain)) * 4.2 + Math.abs(simWater) * 3.5)} mm. Canal intervals stretch past 21 days, desiccating shallow root zones.
+                      </p>
+                    </div>
+
+                    {/* Danger 3: Pumping Cost Surge */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Tubewell Energy Cost Surge</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-100 text-indigo-700">
+                          +{Math.round(Math.abs(simWater) * 1.35 + (simTemp * 5))}% Cost Surge
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${Math.min(100, Math.round(Math.abs(simWater) * 1.35 + (simTemp * 5)))}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Aquifer drawdown forces deeper tubewell suction, triggering a {Math.round(Math.abs(simWater) * 1.35 + (simTemp * 5))}% increase in diesel and grid electric expenses.
+                      </p>
+                    </div>
+
+                    {/* Danger 4: Monoculture Yield Loss */}
+                    <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Monoculture Yield Failure</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">
+                          -{traditionalLoss2060}% Drop
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-rose-600 h-1.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${Math.min(100, Math.round(traditionalLoss2060 * 2.5))}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Continuous cereal monocultures collapse under prolonged dry spells, suffering steep biological yield penalties.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* TWO COMPARATIVE CHARTS SIDE-BY-SIDE */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   {/* Chart 1: Climate Risk Yield Impact (%) */}
@@ -2917,67 +3057,101 @@ interface DynamicStratCard {
                 </div>
 
                 {/* Recalculated Score Table & Explanation */}
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Recalculated Suitability Under Stress Scenario
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-black">
-                      Strategy B Ranks First!
-                    </span>
-                  </div>
+                {(() => {
+                  const baseA = dynamicStrategies[0]?.overallScore || 84;
+                  const baseB = dynamicStrategies[1]?.overallScore || 93;
+                  const baseC = dynamicStrategies[2]?.overallScore || 78;
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500 bg-slate-50">
-                          <th className="py-2 px-3">Strategy</th>
-                          <th className="px-3">Current Scenario</th>
-                          <th className="px-3">Changed Scenario</th>
-                          <th className="px-3">Outcome</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium">
-                        <tr className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-bold text-slate-900">Strategy A (Wheat ➔ Chickpea ➔ Maize)</td>
-                          <td className="px-3 font-bold text-slate-600">89</td>
-                          <td className="px-3 font-bold text-rose-600">72</td>
-                          <td className="px-3 text-rose-600 font-bold">Demoted to Rank 2 (-17 pts)</td>
-                        </tr>
-                        <tr className="bg-blue-50/70 font-bold">
-                          <td className="py-2.5 px-3 text-blue-900">Strategy B (Wheat ➔ Pearl Millet ➔ Chickpea)</td>
-                          <td className="px-3 text-blue-800">82</td>
-                          <td className="px-3 font-black text-blue-700 text-sm">88</td>
-                          <td className="px-3 text-emerald-700 font-black">🏆 Promoted to Rank #1 (+6 pts)</td>
-                        </tr>
-                        <tr className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-bold text-slate-900">Strategy C (Wheat ➔ Berseem ➔ Maize)</td>
-                          <td className="px-3 font-bold text-slate-600">76</td>
-                          <td className="px-3 font-bold text-slate-600">68</td>
-                          <td className="px-3 text-slate-500">Rank 3</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  const deltaA = Math.round(-simTemp * 4.2 + (simRain * 0.28) + (simWater * 0.38) - (stressRate * 0.2));
+                  const deltaB = Math.round(-simTemp * 0.8 + (simRain * 0.08) + (simWater * 0.10) + (simTemp >= 1.5 || simWater <= -20 ? 6 : 0) - (stressRate * 0.05));
+                  const deltaC = Math.round(-simTemp * 3.4 + (simRain * 0.22) + (simWater * 0.44) - (stressRate * 0.25));
 
-                  {/* System Takeaway */}
-                  <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 leading-relaxed font-medium">
-                    <strong>System Takeaway:</strong> &ldquo;Under the selected reduced-rainfall and irrigation scenario, Strategy B becomes relatively more suitable because its candidate sequence emphasizes crops with lower water requirements.&rdquo;
-                  </div>
+                  const scoreA = Math.max(45, Math.min(98, baseA + deltaA));
+                  const scoreB = Math.max(50, Math.min(99, baseB + deltaB));
+                  const scoreC = Math.max(40, Math.min(95, baseC + deltaC));
 
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => {
-                        setActiveTab("assistant");
-                        handleSendMessage("Why did Strategy B become better when I reduced rainfall?");
-                      }}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Bot className="w-4 h-4" />
-                      <span>Ask AI To Explain This Shift →</span>
-                    </button>
-                  </div>
-                </div>
+                  const isBWinner = scoreB >= scoreA && scoreB >= scoreC;
+
+                  return (
+                    <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                          Recalculated Suitability Under Stress Scenario
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+                          isBWinner ? "bg-blue-100 text-blue-800" : scoreA >= scoreB ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800"
+                        }`}>
+                          {isBWinner ? "Strategy B Ranks First!" : scoreA >= scoreB ? "Strategy A Ranks First!" : "Strategy C Ranks First!"}
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-slate-500 bg-slate-50">
+                              <th className="py-2 px-3">Strategy</th>
+                              <th className="px-3">Current Scenario</th>
+                              <th className="px-3">Changed Scenario</th>
+                              <th className="px-3">Outcome</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            <tr className={`hover:bg-slate-50 ${scoreA > scoreB ? "bg-emerald-50/50 font-bold" : ""}`}>
+                              <td className="py-2.5 px-3 font-bold text-slate-900">
+                                {dynamicStrategies[0]?.name || "Strategy A"} ({dynamicStrategies[0]?.sequence || "Wheat ➔ Chickpea ➔ Maize"})
+                              </td>
+                              <td className="px-3 font-bold text-slate-600">{baseA}</td>
+                              <td className={`px-3 font-bold ${scoreA < baseA ? "text-rose-600" : "text-emerald-700 font-black text-sm"}`}>{scoreA}</td>
+                              <td className="px-3 font-bold">
+                                {scoreA > scoreB ? (
+                                  <span className="text-emerald-700">🏆 Promoted to Rank #1 (+{scoreA - baseA} pts)</span>
+                                ) : (
+                                  <span className="text-rose-600">Demoted to Rank 2 ({scoreA - baseA} pts)</span>
+                                )}
+                              </td>
+                            </tr>
+                            <tr className={`font-bold ${isBWinner ? "bg-blue-50/70" : ""}`}>
+                              <td className="py-2.5 px-3 text-blue-900">
+                                {dynamicStrategies[1]?.name || "Strategy B"} ({dynamicStrategies[1]?.sequence || "Wheat ➔ Pearl Millet ➔ Chickpea"})
+                              </td>
+                              <td className="px-3 text-blue-800">{baseB}</td>
+                              <td className="px-3 font-black text-blue-700 text-sm">{scoreB}</td>
+                              <td className="px-3 text-emerald-700 font-black">
+                                {isBWinner ? `🏆 Promoted to Rank #1 (+${scoreB - baseB} pts)` : `Rank #2 (${scoreB - baseB} pts)`}
+                              </td>
+                            </tr>
+                            <tr className="hover:bg-slate-50">
+                              <td className="py-2.5 px-3 font-bold text-slate-900">
+                                {dynamicStrategies[2]?.name || "Strategy C"} ({dynamicStrategies[2]?.sequence || "Wheat ➔ Berseem ➔ Maize"})
+                              </td>
+                              <td className="px-3 font-bold text-slate-600">{baseC}</td>
+                              <td className="px-3 font-bold text-slate-600">{scoreC}</td>
+                              <td className="px-3 text-slate-500">Rank 3 ({scoreC - baseC} pts)</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* System Takeaway */}
+                      <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 leading-relaxed font-medium">
+                        <strong>System Takeaway:</strong> &ldquo;Under the selected {simRain < 0 ? "reduced-rainfall" : "simulated"} ({simRain > 0 ? `+${simRain}` : simRain}%) and irrigation ({simWater}%) scenario with +{simTemp}°C warming, Strategy B becomes {isBWinner ? "the top recommended pathway" : "evaluated"} because its candidate sequence optimizes water-resilience and thermal stress endurance.&rdquo;
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => {
+                            setActiveTab("assistant");
+                            handleSendMessage("Why did Strategy B become better when I reduced rainfall?");
+                          }}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Bot className="w-4 h-4" />
+                          <span>Ask AI To Explain This Shift →</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               </div>
 
@@ -3042,12 +3216,12 @@ interface DynamicStratCard {
                         {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                       </div>
 
-                      <div className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
+                      <div className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                         isUser
-                          ? "bg-blue-600 text-white rounded-tr-none shadow-sm font-medium"
+                          ? "bg-blue-600 text-white rounded-tr-none shadow-sm font-medium whitespace-pre-wrap"
                           : "bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-2xs"
                       }`}>
-                        {m.content}
+                        {isUser ? m.content : <StructuredChatContent content={m.content} />}
                       </div>
                     </div>
                   );

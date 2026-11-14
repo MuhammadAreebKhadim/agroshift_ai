@@ -3730,7 +3730,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
             <td class="px-3 text-[11px] font-semibold text-slate-600 max-w-[200px] truncate" title="${dynRot.category}">
               ${dynRot.category}
             </td>
-            <td class="px-3 text-right font-black text-slate-900">${dynRot.score}/100</td>
+            <td class="px-3 text-right font-black text-slate-900">${topFarmRot.score || 93}/100</td>
           </tr>
         `;
       }).join('');
@@ -5116,7 +5116,8 @@ function renderDynamicRotationStrategies() {
           }
         };
 
-        const res = await fetch('http://127.0.0.1:8000/api/assistant/chat', {
+        const endpoint = (window.location.protocol.startsWith('http')) ? '/api/assistant/chat' : 'http://127.0.0.1:8000/api/assistant/chat';
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -5378,7 +5379,7 @@ function renderDynamicRotationStrategies() {
               <td class="px-3"><span class="px-2 py-0.5 rounded bg-slate-100 font-bold">${f.y2026}</span></td>
               <td class="px-3 font-bold text-emerald-700">${f.y2027 || dynRot.y2027}</td>
               <td class="px-3 font-bold text-blue-700">${f.y2028 || dynRot.y2028}</td>
-              <td class="px-3 text-right font-black text-slate-900">${dynRot.score || f.score || 85}/100</td>
+              <td class="px-3 text-right font-black text-slate-900">${winner.overallScore}/100</td>
             </tr>
           `;
         }).join('');
