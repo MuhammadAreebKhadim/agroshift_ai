@@ -1,174 +1,191 @@
-# AgroShift AI 🌾🛰️
+# 🌾 AgroShift AI — Climate-Smart Crop Succession & Resilient Agronomy Engine
 > **NASA Space Apps Challenge 2026**  
-> *Transforming NASA Earth Observations into Resilient Crop Rotations & Climate Stress Simulations*
+> *Transforming NASA Earth Observations into Resilient Crop Rotations, Decadal Yield Risk Projections, and Interactive Climate Stress Simulations*
+
+[![Live Production Web App](https://img.shields.io/badge/Live%20App-agroshift--ai--nu.vercel.app-2563eb?style=for-the-badge&logo=vercel)](https://agroshift-ai-nu.vercel.app)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-10b981?style=for-the-badge&logo=github)](https://github.com/MuhammadAreebKhadim/agroshift_ai.git)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38bdf8?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+[![NASA POWER](https://img.shields.io/badge/NASA_POWER-Agroclimatology-f59e0b?style=for-the-badge&logo=nasa)](https://power.larc.nasa.gov/)
+
+---
+
+## 📸 Visual Showcase & Platform Tour
+
+### 1. Farm Demographics & Real-Time Succession Dashboard
+Real-time integration of farm coordinates, multi-field parcel succession plans, NASA climatological metrics, and live crop rotation leaderboard.
+![Farm Dashboard](docs/screenshots/01_farm_dashboard.png)
+
+### 2. Rotation Succession Planner & 13-Crop Agronomic Engine
+Evaluates 3 optimal rotational strategies with dynamic scientific rationale synthesis, interactive parcel succession dropdowns ($2026 \to 2027 \to 2028$), and the 13-crop PARC/FAO-56 verified knowledge matrix.
+![Rotation Planner](docs/screenshots/02_rotation_planner.png)
+
+### 3. OpenStreetMap Leaflet Geo-Detection & Agro-Ecological Mapping
+Interactive geographic boundary locator with satellite layer toggle, regional command area presets, and automatic agro-ecological zone detection.
+![Interactive Map & Geo-Detection](docs/screenshots/03_map_detection.png)
+
+### 4. Climate Forecast-Driven Adaptation ROI Analyzer & What-If Stress Simulator
+Parametric climate stress engine featuring vertical sliders ($-40\%$ Rain, $+4.0^\circ\text{C}$ Heat, $-50\%$ Canal Water), decadal yield impact curves ($2020s \to 2060s$), future climate hazard alerts, and recalculated suitability scoring.
+![Climate Forecast Adaptation](docs/screenshots/04_climate_forecast.png)
+
+### 5. AgriAI Advisor Grounded Agronomic Consultation
+Context-aware, structured markdown responses grounded in live farm demographics, NASA observations, and simulated stress curves.
+![AI Assistant](docs/screenshots/05_ai_assistant.png)
 
 ---
 
 ## 🌟 Executive Summary
 
-Traditional agricultural apps suggest only a single, isolated crop based on basic NPK soil tests. **AgroShift AI** pioneers a multi-season crop rotation decision-support engine powered by **NASA POWER Earth Observations**, deterministic agronomic scoring, and an interactive **What-If Climate Stress Simulator**.
+Traditional digital agriculture tools suffer from a fatal flaw: they recommend only a **single, isolated crop** based on basic chemical soil tests. In reality, modern agriculture depends on **multi-season crop rotation sequences** to break pest cycles, prevent aquifer exhaustion, and biologically restore soil fertility.
 
-### Key Differentiators for Hackathon Judges
-| Conventional Crop Apps | AgroShift AI |
+**AgroShift AI** bridges the gap between **NASA Earth Observations** and field-level agronomic decision-making. By coupling 365-day satellite meteorological data from **NASA POWER** with a deterministic 13-crop agronomic matrix and an interactive **What-If Climate Stress Simulator**, AgroShift AI empowers smallholders and agricultural policymakers to visualize, evaluate, and adapt multi-year crop successions against rising heat and water scarcity.
+
+---
+
+## 🚀 Key Innovations & Differentiators
+
+| Conventional Farming Apps | AgroShift AI |
 | :--- | :--- |
-| Recommends an isolated single crop | Evaluates **multi-season crop rotation sequences** (e.g. Wheat → Legumes → Maize) |
-| Uses only basic soil test numbers | Integrates **365-day NASA POWER satellite & meteorological observations** |
-| Mystery blackbox recommendation | **100% transparent formula**: 30% Climate + 25% Water + 25% Soil + 20% Priority |
-| Static, one-time output | **Signature What-If Simulator**: Live recalculation under -30% rain and +3°C heat |
-| Generic LLM hallucinations | **Grounded AI Explainer**: Strictly constrained to NASA data and calculated engine metrics |
+| **Isolated Crop Advice**: Suggests only a single crop for next season | **Multi-Year Succession Planning**: Evaluates 3-year rotational sequences ($2026 \to 2027 \to 2028$) |
+| **Static Soil Test Input**: Relies solely on laboratory NPK numbers | **NASA POWER Climatology**: Integrates precipitation, surface temperature, and solar insolation |
+| **Blackbox Opaque AI**: Unexplainable recommendation scores | **100% Transparent Formula**: $30\%$ Climate + $25\%$ Water + $25\%$ Soil + $20\%$ Priority |
+| **Static Output**: One-time static recommendations | **Interactive What-If Simulator**: Real-time stress engine with vertical sliders and decadal yield curves |
+| **Hallucinated Chatbots**: Ungrounded general-purpose LLMs | **AgriAI Advisor**: Grounded in field parcels, NASA observations, and stress outcomes |
 
 ---
 
-## 📐 System Architecture
+## 🌾 Comprehensive 13-Crop Agronomic Knowledge Matrix
+
+Verified against standards from the **Food and Agriculture Organization (FAO-56)**, the **Pakistan Agricultural Research Council (PARC)**, and regional extension bulletins:
+
+| # | Crop Name | Botanical Name | Season | Water Demand | Optimal pH | Biological N-Fixation | Drought Tolerance | Primary Rotation Benefit |
+|:-:|:---|:---|:---|:---:|:---:|:---:|:---:|:---|
+| 1 | **Wheat** | *Triticum aestivum* | Rabi (Winter) | $400\text{ mm}$ | $6.0 - 8.0$ | $0\text{ kg/ha}$ | Medium | Staple food security, straw value, reliable cashflow. |
+| 2 | **Chickpea** | *Cicer arietinum* | Rabi (Winter) | $250\text{ mm}$ | $6.0 - 8.2$ | $65\text{ kg N/ha}$ | High | Biological nitrogen fixation, taproot fractures subsoil hardpan. |
+| 3 | **Lentils** | *Lens culinaris* | Rabi (Winter) | $220\text{ mm}$ | $6.0 - 7.8$ | $50\text{ kg N/ha}$ | Medium | Short 105-day cycle, low water demand, enriches organic N. |
+| 4 | **Maize** | *Zea mays* | Kharif / Spring | $550\text{ mm}$ | $5.8 - 7.5$ | $0\text{ kg/ha}$ | Low | High biomass commercial grain yield, heavy residue recycling. |
+| 5 | **Sorghum** | *Sorghum bicolor* | Kharif (Summer) | $380\text{ mm}$ | $5.5 - 8.5$ | $0\text{ kg/ha}$ | Very High | Scavenges subsoil moisture, heat tolerant $>42^\circ\text{C}$, premium green fodder. |
+| 6 | **Berseem** | *Trifolium alexandrinum* | Rabi to Spring | $500\text{ mm}$ | $6.5 - 8.5$ | $110\text{ kg N/ha}$ | Low | 4–6 continuous fodder cuttings, dairy integration, rebuilds soil microbes. |
+| 7 | **Cotton** | *Gossypium hirsutum* | Kharif (Summer) | $650\text{ mm}$ | $6.0 - 8.5$ | $0\text{ kg/ha}$ | Medium | Major cash crop, deep taproot aeration for succeeding wheat. |
+| 8 | **Rice** | *Oryza sativa* | Kharif (Monsoon) | $1,100\text{ mm}$ | $5.5 - 7.5$ | $0\text{ kg/ha}$ | Low | High export revenue, continuous standing water flushes sodic salts. |
+| 9 | **Soybean** | *Glycine max* | Kharif (Summer) | $450\text{ mm}$ | $6.0 - 7.5$ | $65\text{ kg N/ha}$ | Medium | High protein edible oilseed, leaves $+65\text{ kg N/ha}$ credit for succeeding crop. |
+| 10 | **Mustard** | *Brassica juncea* | Rabi (Winter) | $280\text{ mm}$ | $6.0 - 8.0$ | $0\text{ kg/ha}$ | High | Glucosinolate root exudates naturally biofumigate nematodes and soil fungi. |
+| 11 | **Mung Bean** | *Vigna radiata* | Zaid / Summer Catch | $200\text{ mm}$ | $6.2 - 7.8$ | $45\text{ kg N/ha}$ | High | 65-day maturity fits empty fallow windows, rapid organic matter build. |
+| 12 | **Pearl Millet** | *Pennisetum glaucum* | Kharif (Summer) | $280\text{ mm}$ | $5.5 - 8.5$ | $0\text{ kg/ha}$ | Very High | Extreme heat & moisture stress resilience; climbs to Rank #1 under drought. |
+| 13 | **Sugarcane** | *Saccharum officinarum* | Annual / Kharif | $1,400\text{ mm}$ | $6.0 - 8.2$ | $0\text{ kg/ha}$ | Low (High Water) | High sugar and bioenergy cash income, heavy bagasse biomass recycling. |
+
+---
+
+## 🔬 Deterministic Agronomic Scoring Formula
+
+To ensure transparency and trust with farmers and agronomists, AgroShift AI uses a deterministic mathematical evaluation model rather than unexplainable blackbox predictions:
+
+$$\text{Overall Match Score} = (S_{\text{climate}} \times 0.30) + (S_{\text{water}} \times 0.25) + (S_{\text{soil}} \times 0.25) + (S_{\text{priority}} \times 0.20)$$
+
+### 1. Climate Suitability ($S_{\text{climate}}$)
+Calculated from NASA POWER daily maximum and minimum temperatures across the crop growing calendar:
+$$S_{\text{climate}} = 100 - \left( \text{Heat Stress Days} \times 2.5 \right) - \left( \Delta T_{\text{optimal}} \times 3.0 \right)$$
+
+### 2. Water Deficit Index ($S_{\text{water}}$)
+Compares crop evapotranspiration ($ET_c$) against NASA POWER annual precipitation ($P$) and available irrigation water ($I$):
+$$S_{\text{water}} = \max\left(30, 100 - \frac{|ET_c - (P + I)|}{ET_c} \times 100\right)$$
+
+### 3. Soil Physico-Chemical Fit ($S_{\text{soil}}$)
+Penalizes soil texture mismatches and pH nutrient lockout:
+$$S_{\text{soil}} = 100 - \left( |\text{pH}_{\text{actual}} - \text{pH}_{\text{optimal}}| \times 12 \right) - \text{TexturePenalty}$$
+
+### 4. Farmer Priority Alignment ($S_{\text{priority}}$)
+Dynamically reweights candidates according to the farmer's operational goals (*Water Conservation*, *Soil Health & Nitrogen Fixation*, or *High Yield / Commercial Profit*).
+
+---
+
+## 🛰️ NASA Earth Observations Used
+
+AgroShift AI interfaces with the **NASA Prediction of Worldwide Energy Resources (POWER)** Agroclimatology dataset:
+
+| NASA Parameter | Description | Agronomic Utility in AgroShift AI |
+|:---|:---|:---|
+| **`PRECTOTCORR`** | Corrected Precipitation ($mm/day$) | Computes monthly rainfall totals, drought spells, and irrigation deficit ratios. |
+| **`T2M`** | Temperature at 2 Meters ($^\circ\text{C}$) | Tracks monthly average thermal trends across vegetative growth stages. |
+| **`T2M_MAX`** | Daily Maximum Temperature ($^\circ\text{C}$) | Identifies crop heat blast and pollination sterility hazards ($T_{\max} \ge 35^\circ\text{C}$). |
+| **`T2M_MIN`** | Daily Minimum Temperature ($^\circ\text{C}$) | Detects winter chilling injury and frost risk for rabi pulses and clover. |
+| **`ALLSKY_SFC_SW_DWN`** | All-Sky Surface Solar Irradiance ($MJ/m^2/day$) | Evaluates photosynthetic active radiation (PAR) and dry matter biomass potential. |
+
+---
+
+## 💻 Tech Stack & Architecture
 
 ```
-FARMER / EXTENSION OFFICER
-           │
-           ▼
-    NEXT.JS FRONTEND (React 18, Tailwind CSS, Recharts, Leaflet OpenStreetMap)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │ 1. /farm-setup       - Interactive Leaflet coordinate & soil UI │
-   │ 2. /dashboard        - NASA POWER Earth Observation KPI cards   │
-   │ 3. /rotation-planner - 3 Candidate strategies & formula drawer  │
-   │ 4. /simulator        - Signature What-If Climate Stress Sliders │
-   │ 5. /assistant        - Grounded AI Explainer (Gemini API)       │
-   └────────────────────────────────┬────────────────────────────────┘
-                                    │ REST API
-                                    ▼
-       FASTAPI BACKEND (Python 3.14 / 3.11, SQLite, SQLAlchemy, Pydantic)
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  • NASA POWER API Client (Daily PRECTOTCORR, T2M, ALLSKY Solar) │
-   │  • Climatological Derived Indicators (Heat Stress, Dry Spells)  │
-   │  • Deterministic Rotation Scoring Engine (12 FAO/PARC crops)    │
-   │  • What-If Parametric Shock Recalculator                        │
-   │  • AI Assistant Pipeline (Google Gemini 2.5 Flash)              │
-   └─────────────────────────────────────────────────────────────────┘
+                                    USER (Web Browser)
+                                            │
+                                            ▼
+                    ┌──────────────────────────────────────────────┐
+                    │     NEXT.JS 14 FRONTEND (React 18 & TS)      │
+                    │  • Fullscreen Responsive Fluid Layout        │
+                    │  • Tailwind CSS with Lucide Icons            │
+                    │  • Recharts 12-Month Multi-Line Weather      │
+                    │  • Leaflet Interactive OpenStreetMap Canvas  │
+                    │  • Client-Side What-If Parametric Simulator  │
+                    └───────────────────────┬──────────────────────┘
+                                            │
+                        ┌───────────────────┴───────────────────┐
+                        ▼                                       ▼
+            ┌──────────────────────┐                ┌──────────────────────┐
+            │  VERCEL SERVERLESS   │                │   NASA POWER API     │
+            │  EDGE API ROUTES     │                │   Agroclimatology    │
+            │  • /api/farms        │                │   Daily Data Service │
+            │  • /api/nasa/point   │                │   • PRECTOTCORR      │
+            │  • /api/rotations    │                │   • T2M / T2M_MAX    │
+            │  • /api/simulator    │                │   • ALLSKY Solar     │
+            │  • /api/assistant    │                └──────────────────────┘
+            └──────────┬───────────┘
+                       │
+                       ▼
+            ┌──────────────────────┐
+            │      GROQ API        │
+            │  Llama-3.3-70b-Vers. │
+            │  Grounded AI Copilot │
+            └──────────────────────┘
 ```
 
 ---
 
-## 🛰️ NASA POWER API Integration
+## 🛠️ Local Development & Quickstart
 
-AgroShift AI directly queries the **NASA Prediction of Worldwide Energy Resources (POWER)** Agroclimatology dataset for any point on Earth:
-- **`PRECTOTCORR`**: Corrected daily precipitation (mm/day)
-- **`T2M`**: Temperature at 2 meters above ground (°C)
-- **`T2M_MAX` & `T2M_MIN`**: Daily maximum and minimum temperatures
-- **`ALLSKY_SFC_SW_DWN`**: All-sky surface downward solar irradiance ($MJ/m^2/day$)
+### Prerequisites
+- Node.js `18.x` or higher
+- Python `3.11` or higher
+- Git
 
-### Derived Agronomic Intelligence
-Instead of merely graphing raw lines, AgroShift converts NASA measurements into actionable agronomic indicators:
-1. **Heat Stress Days ($T_{\max} \ge 35^\circ\text{C}$)**: Identifies heat spikes during critical flowering/silking phases.
-2. **Seasonal Water Balance**: Rabi (Winter) vs. Kharif (Monsoon/Summer) precipitation totals compared against crop evapotranspiration.
-3. **Dry Spell Streaks**: Maximum consecutive rainless days ($<1.0\text{ mm}$) to evaluate pulse drought resilience.
-4. **Photosynthetic Potential**: Seasonal solar insolation index.
-
-*Scientific Note: NASA POWER provides meteorological and solar observations. Soil texture, pH, and irrigation capacity are farmer field-verified inputs.*
-
----
-
-## 🌾 The 12-Crop Knowledge Matrix
-
-Documented agronomic properties compiled from **FAO**, **PARC (Pakistan Agricultural Research Council)**, and **NARC**:
-
-1. **Wheat** *(Triticum aestivum)*: Rabi staple cereal (350–450 mm water, 15–25°C opt).
-2. **Chickpea** *(Cicer arietinum)*: Rabi nitrogen-fixing pulse (200–300 mm water, fixes 40–70 kg N/ha, deep taproot).
-3. **Lentils** *(Lens culinaris)*: Rabi low-water pulse (180–250 mm water, fixes 35–55 kg N/ha).
-4. **Maize** *(Zea mays)*: Kharif high-yield cereal (500–650 mm water, high fertilizer feeder).
-5. **Sorghum** *(Sorghum bicolor)*: Kharif drought-resilient C4 cereal/fodder (300–450 mm water, heat tolerant up to 42°C).
-6. **Berseem** *(Trifolium alexandrinum)*: Rabi legume "King of Fodders" (fixes 100+ kg N/ha, 4–6 multicut harvests).
-7. **Cotton** *(Gossypium hirsutum)*: Kharif industrial cash crop (600–750 mm water).
-8. **Rice** *(Oryza sativa)*: Kharif staple cereal (900–1300 mm water).
-9. **Soybean** *(Glycine max)*: Kharif high-protein pulse/oilseed (fixes 70–100 kg N/ha).
-10. **Mustard / Canola** *(Brassica juncea)*: Rabi short-season oilseed with natural biofumigation.
-11. **Mung Bean** *(Vigna radiata)*: 60-day summer catch pulse (150–250 mm water).
-12. **Pearl Millet** *(Pennisetum glaucum)*: Kharif extreme heat & drought endurance cereal.
-
----
-
-## ⚖️ Transparent Scoring Formula
-
-No opaque blackbox logic. Every rotation sequence is scored from 0 to 100 using:
-
-$$\text{Rotation Score} = 0.30 \times S_{\text{Climate}} + 0.25 \times S_{\text{Water}} + 0.25 \times S_{\text{Soil}} + 0.20 \times S_{\text{Priority}}$$
-
-- **$S_{\text{Climate}}$ (30%)**: Thermal envelope compatibility, heat stress days penalty, and frost risk penalty.
-- **$S_{\text{Water}}$ (25%)**: Ratio of available water (NASA rain + farmer irrigation turns) vs. cumulative sequence water demand.
-- **$S_{\text{Soil}}$ (25%)**: Soil texture compatibility and quadratic deviation from optimal soil pH.
-- **$S_{\text{Priority}}$ (20%)**: Operational goal weighting (Soil Health rewards N-fixation; Water Conservation rewards drought tolerance; Yield rewards high cash value).
-
----
-
-## ⚡ The Signature What-If Simulator
-
-The signature feature of AgroShift AI allows farmers and judges to stress-test rotation resilience:
-- **Rainfall Shift**: $0\%, -10\%, -20\%, -30\%$
-- **Temperature Anomaly**: $0^\circ\text{C}, +1^\circ\text{C}, +2^\circ\text{C}, +3^\circ\text{C}$
-- **Canal / Groundwater Availability**: $0\%, -10\%, -20\%, -30\%$
-
-**The Demonstration Moment**:
-- Under baseline conditions, **Strategy A (Wheat → Chickpea → Maize)** is Rank #1 (84 pts).
-- When a $-30\%$ rainfall cut and $+3^\circ\text{C}$ heat wave are applied, Maize suffers severe heat and moisture stress, dropping Strategy A by 12 points.
-- **Strategy B (Wheat → Sorghum → Chickpea)** drops by only 2 points and **climbs to Rank #1 (81.4 pts)** because Sorghum is a C4 plant and Chickpea requires 50% less water!
-
----
-
-## 🚀 Quick Start (Local Run)
-
-### 1. Launch with 1-Click
-Double-click `run_local.bat` (or execute `.\run_local.ps1` in PowerShell).
-
-### 2. Manual Launch
-**Backend**:
+### 1. Clone the Repository
 ```bash
-cd backend
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+git clone https://github.com/MuhammadAreebKhadim/agroshift_ai.git
+cd agroshift_ai
 ```
 
-**Frontend**:
+### 2. Run the Next.js Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-Open:
-- **Frontend App**: `http://localhost:3000`
-- **FastAPI Interactive Docs**: `http://127.0.0.1:8000/docs`
-
----
-
-## ☁️ Deployment Guide
-
-### Deploy Backend to Render or Railway
-1. **Render (1-Click Blueprint)**:
-   - Connect your GitHub repo on [render.com](https://render.com).
-   - Render automatically reads `backend/render.yaml` and deploys your FastAPI service.
-   - Set `GEMINI_API_KEY` in Render environment variables.
-2. **Railway**:
-   - Run `railway up` from the `backend/` folder or import via GitHub.
-   - Railway uses `backend/Procfile` or `backend/Dockerfile`.
-
-### Deploy Frontend to Vercel
-1. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
-2. Select the `frontend` root directory.
-3. Add Environment Variable:
-   - `NEXT_PUBLIC_API_URL`: `https://your-backend-app.onrender.com/api`
-4. Click **Deploy**! Live in under 60 seconds.
+### 3. Run the FastAPI Backend (Optional Local Service)
+```bash
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate  # Windows
+source .venv/bin/activate # Linux/macOS
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
 ---
 
-## 🏆 Presentation Walkthrough for Judges (3-Minute Script)
+## 👥 Team: Hungry coders
+- **Muhammad Areeb Khadim** — Lead Full-Stack Architect & Agronomic Modeling
+- **Development Team** — NASA Data Integration, Climate Stress Engineering, UI/UX Design
 
-1. **Step 1: Open AgroShift AI (`/`)**: Show the NASA Space Apps banner and explain that we solve the crop rotation puzzle, not just single-crop guesswork.
-2. **Step 2: Farm Setup (`/farm-setup`)**: Click the **"Faisalabad, Pakistan"** preset. Show the interactive Leaflet map and soil inputs (pH 7.5, Loamy soil). Click *Save Farm*.
-3. **Step 3: NASA Earth Intelligence (`/dashboard`)**: Show the live NASA POWER observations (504 mm rain, 184 heat stress days, 79-day dry spell streak) and the interactive Recharts temperature/precipitation charts.
-4. **Step 4: Rotation Planner (`/rotation-planner`)**: Showcase the 3 candidate strategies with transparent score cards. Click **"Inspect Scoring Formula"** to show judges the deterministic math behind the rankings.
-5. **Step 5: What-If Simulator (`/simulator`)**: Move the Rainfall slider to **-30%** and Temperature to **+3°C**. Show the instant rank reshuffle where **Strategy B (Water-Conscious)** takes Rank #1!
-6. **Step 6: AI Assistant (`/assistant`)**: Click the prompt *"Why is Strategy B better under limited rainfall?"* and watch the grounded AI explain the C4 physiology of Sorghum and biological nitrogen fixation of Chickpea.
-
----
-
-Built with ❤️ for sustainable agriculture and global food security.
+*Developed for the NASA Space Apps Challenge 2026.*
