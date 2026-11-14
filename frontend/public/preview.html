@@ -2040,7 +2040,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
                     <span>Strategy A</span>
                     <span class="text-[10px] text-slate-400 font-mono">Soil Health Focus</span>
                   </div>
-                  <div class="text-xs text-slate-700 font-semibold truncate">Wheat → Chickpea → Maize</div>
+                  <div id="sim-seq-a" class="text-xs text-slate-700 font-semibold truncate">Strategy A Sequence</div>
                   <div class="flex items-center justify-center gap-2 mt-1">
                     <span id="base-score-a" class="text-xs text-slate-400 line-through">89</span>
                     <span id="res-a" class="text-3xl font-black text-slate-800">71</span>
@@ -3481,6 +3481,863 @@ svg.leaflet-image-layer.leaflet-interactive path {
       "Pearl Millet", "Soybean", "Mustard", "Mung Bean"
     ];
 
+    function getRotationForCrop(crop, soil, ph, pri, irrig, customY2027, customY2028) {
+      const curSoil = soil ? (soil.split(' ')[0] || 'Loamy') : (document.getElementById('farm-soil')?.value || 'Loamy');
+      const curPh = parseFloat(ph) || parseFloat(document.getElementById('farm-ph')?.value) || 7.5;
+      const curPriority = pri || document.getElementById('farm-priority')?.value || 'Water conservation';
+      const curIrrig = irrig || document.getElementById('farm-irrigation')?.value || 'Limited groundwater';
+
+      const strats = computePreviewStrategies(crop, curSoil, curPh, curPriority, curIrrig);
+      const sorted = [...strats].sort((a, b) => b.overallScore - a.overallScore);
+      const best = sorted[0];
+
+      const parts = best.sequence.split('➔').map(s => s.trim());
+      const y2027 = customY2027 || parts[1] || 'Chickpea';
+      const y2028 = customY2028 || parts[2] || 'Maize';
+
+      let score = best.overallScore;
+      let strategy = best.name;
+      let category = best.focusPoints[0] || 'Optimized Agro-Ecological Succession';
+      let color = `${best.badgeBg} ${best.badgeText}`;
+
+      // If user customized 2027/2028 in the table dropdowns, evaluate match
+      if (customY2027 || customY2028) {
+        const matchB = strats[1].sequence.includes(y2027) && strats[1].sequence.includes(y2028);
+        const matchA = strats[0].sequence.includes(y2027) && strats[0].sequence.includes(y2028);
+        const matchC = strats[2].sequence.includes(y2027) && strats[2].sequence.includes(y2028);
+
+        if (matchB) {
+          score = strats[1].overallScore;
+          strategy = strats[1].name;
+          category = strats[1].focusPoints[0];
+          color = `${strats[1].badgeBg} ${strats[1].badgeText}`;
+        } else if (matchA) {
+          score = strats[0].overallScore;
+          strategy = strats[0].name;
+          category = strats[0].focusPoints[0];
+          color = `${strats[0].badgeBg} ${strats[0].badgeText}`;
+        } else if (matchC) {
+          score = strats[2].overallScore;
+          strategy = strats[2].name;
+          category = strats[2].focusPoints[0];
+          color = `${strats[2].badgeBg} ${strats[2].badgeText}`;
+        } else {
+          score = Math.max(68, best.overallScore - 6);
+          strategy = "Custom Succession Plan";
+          category = `Field-tailored rotation: ${crop} ➔ ${y2027} ➔ ${y2028}`;
+          color = "bg-indigo-100 text-indigo-800";
+        }
+      }
+
+      return {
+        y2027: y2027,
+        y2028: y2028,
+        strategy: strategy,
+        score: score,
+        category: category,
+        color: color
+      };
+    }
+
+    function applyStrategyToAllParcels(stratIdx) {
+      const curCrop = (window.registeredFields && window.registeredFields.length > 0)
+        ? window.registeredFields[0].y2026
+        : (document.getElementById('farm-crop')?.value || 'Wheat');
+      const curSoil = document.getElementById('farm-soil')?.value || 'Loamy';
+      const curPh = parseFloat(document.getElementById('farm-ph')?.value) || 7.5;
+      const curPri = document.getElementById('farm-priority')?.value || 'Water conservation';
+      const curIrr = document.getElementById('farm-irrigation')?.value || 'Limited groundwater';
+
+      const strats = computePreviewStrategies(curCrop, curSoil, curPh, curPri, curIrr);
+      const chosen = strats[stratIdx] || strats[0];
+      const parts = chosen.sequence.split('➔').map(s => s.trim());
+      const nextCrop = parts[1] || 'Chickpea';
+      const futCrop = parts[2] || 'Maize';
+
+      if (window.registeredFields.length === 0) {
+        const farmAreaVal = parseFloat(document.getElementById('farm-size')?.value) || 30;
+        window.registeredFields = [{
+          id: 'Field 1 (Whole Farm)',
+          acres: farmAreaVal,
+          soil: curSoil + ' (pH ' + curPh.toFixed(1) + ')',
+          ph: curPh,
+          y2026: curCrop,
+          y2027: nextCrop,
+          y2028: futCrop,
+          strategy: chosen.name,
+          score: chosen.overallScore,
+          category: chosen.focusPoints[0],
+          color: `${chosen.badgeBg} ${chosen.badgeText}`
+        }];
+      } else {
+        window.registeredFields.forEach(f => {
+          f.y2027 = nextCrop;
+          f.y2028 = futCrop;
+          f.strategy = chosen.name;
+          f.score = chosen.overallScore;
+          f.category = chosen.focusPoints[0];
+          f.color = `${chosen.badgeBg} ${chosen.badgeText}`;
+        });
+      }
+
+      renderRotationPlannerFieldsTable();
+      renderDashboard();
+      alert(`Applied ${chosen.name} (${chosen.sequence}) to all registered field parcels!`);
+    }
+    function renderRotationPlannerFieldsTable() {
+      const tbody = document.getElementById('rot-fields-tbody');
+      const farmAreaVal = parseFloat(document.getElementById('farm-size')?.value) || 30;
+      const curCrop = document.getElementById('farm-crop')?.value || 'Wheat';
+      const curSoil = document.getElementById('farm-soil')?.value || 'Loamy';
+      const curPh = parseFloat(document.getElementById('farm-ph')?.value) || 7.5;
+      const curIrrig = document.getElementById('farm-irrigation')?.value || 'Limited groundwater';
+
+      const rot = getRotationForCrop(curCrop, curSoil, curPh);
+
+      const activeFields = window.registeredFields.length > 0 ? window.registeredFields : [
+        {
+          id: (document.getElementById('reg-field-id')?.value.trim()) || 'Field 1 (Whole Farm)',
+          acres: farmAreaVal,
+          soil: curSoil + ' (pH ' + curPh.toFixed(1) + ')',
+          ph: curPh,
+          y2026: curCrop,
+          y2027: rot.y2027,
+          y2028: rot.y2028,
+          strategy: rot.strategy,
+          score: rot.score,
+          category: rot.category,
+          color: rot.color
+        }
+      ];
+
+      const totalAcres = activeFields.reduce((sum, f) => sum + f.acres, 0);
+
+      // Update Top Stats
+      const rotTotalArea = document.getElementById('rot-total-area');
+      if (rotTotalArea) rotTotalArea.textContent = totalAcres.toLocaleString() + ' ac';
+      const rotFieldsCount = document.getElementById('rot-fields-count');
+      if (rotFieldsCount) rotFieldsCount.textContent = activeFields.length + ' Active Field Parcel' + (activeFields.length !== 1 ? 's' : '');
+      const rotDomCrop = document.getElementById('rot-dominant-crop');
+      if (rotDomCrop) rotDomCrop.textContent = curCrop;
+      const rotSoilDiv = document.getElementById('rot-soil-div');
+      if (rotSoilDiv) rotSoilDiv.textContent = curSoil;
+      const rotSoilSub = document.getElementById('rot-soil-sub');
+      if (rotSoilSub) rotSoilSub.textContent = 'pH ' + curPh.toFixed(1) + ' • ' + curIrrig;
+      const topFarmRot = getRotationForCrop(curCrop, curSoil, curPh);
+      const rotTopStrat = document.getElementById('rot-top-strat');
+      if (rotTopStrat) rotTopStrat.textContent = topFarmRot.score + ' / 100';
+      const rotTopStratName = document.getElementById('rot-top-strat-name');
+      if (rotTopStratName) rotTopStratName.textContent = topFarmRot.strategy;
+
+      if (!tbody) return;
+
+      tbody.innerHTML = activeFields.map((f, i) => {
+        const options2027 = ALL_13_CROPS_LIST.map(c => `<option value="${c}" ${c === f.y2027 ? 'selected' : ''}>${c}</option>`).join('');
+        const options2028 = ALL_13_CROPS_LIST.map(c => `<option value="${c}" ${c === f.y2028 ? 'selected' : ''}>${c}</option>`).join('');
+
+        const dynRot = getRotationForCrop(f.y2026, f.soil, f.ph, curPriority, curIrrig, f.y2027, f.y2028);
+        return `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="py-2.5 px-3 font-bold text-slate-900">${f.id}</td>
+            <td class="px-3 font-mono font-bold">${f.acres} ac</td>
+            <td class="px-3 text-slate-600">${f.soil}</td>
+            <td class="px-3"><span class="px-2 py-0.5 rounded bg-slate-100 font-bold">${f.y2026}</span></td>
+            <td class="px-3">
+              <select onchange="updateFieldYearCrop(${i}, 'y2027', this.value)" class="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-300 font-bold text-emerald-800 text-xs shadow-xs focus:ring-1 focus:ring-emerald-500 cursor-pointer">
+                ${options2027}
+              </select>
+            </td>
+            <td class="px-3">
+              <select onchange="updateFieldYearCrop(${i}, 'y2028', this.value)" class="px-2 py-1 rounded-md bg-blue-50 border border-blue-300 font-bold text-blue-800 text-xs shadow-xs focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                ${options2028}
+              </select>
+            </td>
+            <td class="px-3">
+              <span class="px-2.5 py-1 rounded-md text-[11px] font-bold ${dynRot.color}">
+                ${dynRot.strategy}
+              </span>
+            </td>
+            <td class="px-3 text-[11px] font-semibold text-slate-600 max-w-[200px] truncate" title="${dynRot.category}">
+              ${dynRot.category}
+            </td>
+            <td class="px-3 text-right font-black text-slate-900">${dynRot.score}/100</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function switchTab(tabId) {
+      if (tabId === 'dashboard') { renderDashboard(); }
+      if (tabId === 'report') { renderActionPlanReport(); }
+      if (tabId === 'simulator') { recalcSim();
+      renderDashboard(); }
+      const tabs = ['hero', 'dashboard', 'farm', 'nasa', 'rotations', 'simulator', 'assistant', 'report'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        const panel = document.getElementById('panel-' + t);
+        if (btn) {
+          btn.classList.remove('active', 'bg-emerald-600', 'text-white', 'shadow-md', 'shadow-emerald-900/40');
+          btn.classList.add('text-slate-400');
+        }
+        if (panel) panel.classList.add('hidden');
+      });
+
+      const activeBtn = document.getElementById('tab-' + tabId);
+      const activePanel = document.getElementById('panel-' + tabId);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'bg-emerald-600', 'text-white', 'shadow-md', 'shadow-emerald-900/40');
+        activeBtn.classList.remove('text-slate-400');
+      }
+      if (activePanel) activePanel.classList.remove('hidden');
+
+      // Update top utility bar breadcrumb
+      const topTab = document.getElementById('top-current-tab');
+      const tabNames = {
+        hero: 'Home',
+        dashboard: 'Farm Dashboard',
+        farm: 'Farm Registration',
+        nasa: 'Envirnoment analysis',
+        rotations: 'Rotation Planner',
+        simulator: 'Forecast',
+        assistant: 'AI Assistant',
+        report: 'Report'
+      };
+      if (topTab) topTab.textContent = tabNames[tabId] || tabId;
+
+      if (tabId === 'nasa') {
+        if (window.lastResolvedClimatology) {
+          applyCoordinateClimatology(window.lastResolvedClimatology, window.lastDetectedArea, window.lastLat, window.lastLon);
+        } else {
+          renderDynamicNasaCurves(currentCityKey);
+        }
+      }
+      if (tabId === 'rotations') {
+        renderDynamicRotationStrategies();
+        renderSavedFieldsChips();
+        renderRotationPlannerFieldsTable();
+      }
+      if (tabId === 'farm') {
+        initLeafletMap();
+        setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 150);
+      }
+    }
+
+// Obsolete mock canvas functions removed to allow full Leaflet synchronization
+
+    function applyLocationAndAnalyze() {
+      switchTab('nasa');
+      if (window.lastResolvedClimatology) {
+        applyCoordinateClimatology(window.lastResolvedClimatology, window.lastDetectedArea, window.lastLat, window.lastLon);
+      } else {
+        renderDynamicNasaCurves(currentCityKey);
+      }
+    }
+
+    // REDRAWS THE 12-MONTH CURVES ACCORDING TO REAL COORDINATES
+    function renderDynamicNasaCurves(cityKey) {
+      const c = REGIONAL_CLIMATE_DATABASE[cityKey] || REGIONAL_CLIMATE_DATABASE['faisalabad'];
+
+      // Update stat cards safely
+      const nLoc = document.getElementById('nasa-loc-label');
+      if (nLoc) nLoc.textContent = c.label;
+      const sTemp = document.getElementById('stat-temp');
+      if (sTemp) sTemp.textContent = c.temp_mean + '°C';
+      const sRain = document.getElementById('stat-rain');
+      if (sRain) sRain.textContent = c.rain_monthly + ' mm';
+      const sTotRain = document.getElementById('stat-total-rain');
+      if (sTotRain) sTotRain.textContent = 'Annual Total: ' + c.rain_annual + ' mm';
+      const sMaxTemp = document.getElementById('stat-maxtemp');
+      if (sMaxTemp) sMaxTemp.textContent = c.temp_max + '°C';
+      const sHeatDays = document.getElementById('stat-heatdays');
+      if (sHeatDays) sHeatDays.textContent = c.heat_days + ' Heat Stress Days';
+      const sSolar = document.getElementById('stat-solar');
+      if (sSolar) sSolar.textContent = c.solar_mean + ' MJ/m²/day';
+      const sDrySpell = document.getElementById('stat-dryspell');
+      if (sDrySpell) sDrySpell.textContent = c.dry_streak + '-Day Dry Spell Streak';
+      const insText = document.getElementById('insight-text');
+      if (insText) insText.textContent = '“' + c.insight + '”';
+
+      // Update Action Plan safely
+      const repLoc = document.getElementById('rep-loc');
+      if (repLoc) repLoc.textContent = c.label;
+      const repTemp = document.getElementById('rep-temp');
+      if (repTemp) repTemp.textContent = c.temp_mean + '°C';
+      const repRain = document.getElementById('rep-rain');
+      if (repRain) repRain.textContent = c.rain_annual + ' mm';
+      const repMaxTemp = document.getElementById('rep-maxtemp');
+      if (repMaxTemp) repMaxTemp.textContent = c.temp_max + '°C';
+
+      // Compute SVG Polyline Points (X coords: 70, 130, 190, 250, 310, 370, 430, 490, 550, 610, 670, 730)
+      const xCoords = [70, 130, 190, 250, 310, 370, 430, 490, 550, 610, 670, 730];
+
+      // Rainfall: 0 to 180 mm -> Y from 230 down to 30 (range 200px)
+      let rainPoints = [];
+      let trendPoints = [];
+      for (let i = 0; i < 12; i++) {
+        const r = c.monthly_rain[i];
+        const y = Math.max(30, Math.min(230, Math.round(230 - (r / 180.0) * 200)));
+        rainPoints.push(xCoords[i] + ',' + y);
+
+        // Declining trend was historical 15% higher
+        const trendY = Math.max(30, Math.min(230, Math.round(230 - ((r * 1.15) / 180.0) * 200)));
+        trendPoints.push(xCoords[i] + ',' + trendY);
+      }
+      const cRain = document.getElementById('curve-rain');
+      if (cRain) cRain.setAttribute('points', rainPoints.join(' '));
+      const cTrend = document.getElementById('curve-trend');
+      if (cTrend) cTrend.setAttribute('points', trendPoints.join(' '));
+
+      // Temperature: 5°C to 45°C -> Y from 230 down to 30 (range 40°C)
+      let tempPoints = [];
+      for (let i = 0; i < 12; i++) {
+        const t = c.monthly_temp[i];
+        const y = Math.max(30, Math.min(230, Math.round(230 - ((t - 5.0) / 40.0) * 200)));
+        tempPoints.push(xCoords[i] + ',' + y);
+      }
+      const cTemp = document.getElementById('curve-temp');
+      if (cTemp) cTemp.setAttribute('points', tempPoints.join(' '));
+
+      // Solar Radiation: 0 to 30 MJ/m² -> Y from 230 down to 50 (range 180px)
+      let solarPoints = [];
+      for (let i = 0; i < 12; i++) {
+        const s = c.monthly_solar[i];
+        const y = Math.max(40, Math.min(230, Math.round(230 - (s / 30.0) * 180)));
+        solarPoints.push(xCoords[i] + ',' + y);
+      }
+      const cSolar = document.getElementById('curve-solar');
+      if (cSolar) cSolar.setAttribute('points', solarPoints.join(' '));
+
+      // Re-draw Dots
+      const dotsGroup = document.getElementById('curve-dots');
+      if (dotsGroup) {
+        dotsGroup.innerHTML = '';
+        for (let i = 0; i < 12; i++) {
+          const rPt = rainPoints[i].split(',');
+          const tPt = tempPoints[i].split(',');
+          dotsGroup.innerHTML += '<circle cx="' + rPt[0] + '" cy="' + rPt[1] + '" r="4" fill="#2563eb" />';
+          dotsGroup.innerHTML += '<circle cx="' + tPt[0] + '" cy="' + tPt[1] + '" r="3.5" fill="#ea580c" />';
+        }
+      }
+
+      
+    }
+
+    // ---------------- SAVE FIELD TO FARM & CHIPS MANAGEMENT ----------------
+    function saveFieldToFarm() {
+      const fidInput = document.getElementById('reg-field-id');
+      const acresInput = document.getElementById('reg-field-acres');
+      const cropInput = document.getElementById('reg-field-crop');
+      const soilInput = document.getElementById('reg-field-soil');
+      const phVal = parseFloat(document.getElementById('farm-ph')?.value) || 7.5;
+      const farmAreaVal = parseFloat(document.getElementById('farm-size')?.value) || 30;
+      const farmNameVal = document.getElementById('farm-name')?.value || 'Farm';
+
+      const fid = (fidInput && fidInput.value.trim()) ? fidInput.value.trim() : ('Field ' + (window.registeredFields.length + 1));
+      let acres = parseFloat(acresInput ? acresInput.value : 0);
+      if (isNaN(acres) || acres <= 0) {
+        acres = 10;
+      }
+      const crop = cropInput ? cropInput.value : (document.getElementById('farm-crop')?.value || 'Wheat');
+      const soil = soilInput ? soilInput.value : (document.getElementById('farm-soil')?.value || 'Loamy');
+
+      const rot = getRotationForCrop(crop, soil, phVal);
+
+      window.registeredFields.push({
+        id: fid,
+        acres: acres,
+        soil: soil + ' (pH ' + phVal.toFixed(1) + ')',
+        ph: phVal,
+        y2026: crop,
+        y2027: rot.y2027,
+        y2028: rot.y2028,
+        strategy: rot.strategy,
+        score: rot.score,
+        category: rot.category,
+        color: rot.color
+      });
+
+      // Show Toast Notification
+      const toast = document.getElementById('reg-field-toast');
+      const toastMsg = document.getElementById('reg-field-toast-msg');
+      if (toast && toastMsg) {
+        toastMsg.textContent = `✅ Saved "${fid}" (${acres} ac • ${crop} • ${soil}) to ${farmNameVal}! Enter next field below.`;
+        toast.classList.remove('hidden');
+        setTimeout(() => { if (toast) toast.classList.add('hidden'); }, 6000);
+      }
+
+      // Auto-increment field ID
+      if (fidInput) fidInput.value = 'Field ' + (window.registeredFields.length + 1);
+
+      renderSavedFieldsChips();
+      renderFieldsTable();
+      renderRotationPlannerFieldsTable();
+      renderDynamicRotationStrategies();
+      renderDashboard();
+    }
+
+    function renderSavedFieldsChips() {
+      const chips = document.getElementById('saved-fields-chips');
+      const badge = document.getElementById('saved-fields-badge');
+      const totalAc = document.getElementById('saved-fields-total-ac');
+      const container = document.getElementById('saved-fields-container');
+      const wholeNotice = document.getElementById('whole-farm-notice');
+
+      if (!chips || !badge) return;
+
+      if (!window.registeredFields || window.registeredFields.length === 0) {
+        badge.textContent = '0 Fields Saved';
+        if (container) container.classList.add('hidden');
+        if (wholeNotice) wholeNotice.classList.remove('hidden');
+        chips.innerHTML = '';
+        return;
+      }
+
+      const total = window.registeredFields.reduce((sum, f) => sum + f.acres, 0);
+      badge.textContent = `${window.registeredFields.length} Field${window.registeredFields.length !== 1 ? 's' : ''} Saved`;
+      if (totalAc) totalAc.textContent = `Total: ${total} ac`;
+      if (container) container.classList.remove('hidden');
+      if (wholeNotice) wholeNotice.classList.add('hidden');
+
+      chips.innerHTML = window.registeredFields.map((f, i) => `
+        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs shadow-2xs">
+          <span class="font-bold text-slate-900">${f.id}</span>
+          <span class="text-slate-400">•</span>
+          <span class="font-semibold text-blue-700">${f.acres} ac</span>
+          <span class="text-slate-400">•</span>
+          <span class="font-medium text-emerald-700">${f.y2026}</span>
+          <button type="button" onclick="removeSavedFieldChip(${i})" class="text-rose-500 hover:text-rose-700 font-bold ml-1 text-sm" title="Remove field">×</button>
+        </div>
+      `).join('');
+    }
+
+    function removeSavedFieldChip(idx) {
+      removeFieldParcel(idx);
+      renderSavedFieldsChips();
+      renderDynamicRotationStrategies();
+      renderDashboard();
+    }
+
+    // ---------------- DYNAMIC CANDIDATE STRATEGIES & INLINE EXPANDABLE DETAILS ----------------
+    let expandedStratKey = null;
+
+    function toggleStratInlineDetails(key) {
+      expandedStratKey = (expandedStratKey === key) ? null : key;
+      renderDynamicRotationStrategies();
+    }
+
+    // 13-Crop Universal Agronomic Knowledge Matrix (FAO-56 & PARC Standard)
+    const CROP_STRATEGIES_PREVIEW = {
+      "Wheat": {
+        seqA: "Wheat ➔ Chickpea ➔ Maize",
+        seqB: "Wheat ➔ Pearl Millet ➔ Chickpea",
+        seqC: "Wheat ➔ Mung Bean ➔ Mustard",
+        focusA: ["Legume biological N-fixation (+65 kg N/ha)", "Soil fertility recharge & hardpan fracturing", "Balanced staple cereal grain succession"],
+        focusB: ["Low-water drought cereal alternative (300mm)", "Aquifer protection under canal water rationing", "C4 heat resilience during summer peak"],
+        focusC: ["Fast 65-day summer pulse catch crop", "High-value edible oilseed cash crop", "Natural glucosinolate biofumigation against nematodes"],
+        baseRatA: "Following cereal staple Wheat, Strategy A introduces deep-taproot Chickpea to biologically fix 65 kg N/ha and de-compact subsurface plow pans before high-biomass Maize.",
+        baseRatB: "Strategy B minimizes seasonal irrigation by succeeding Wheat with drought-hardy Pearl Millet and winter Chickpea, cutting annual water consumption by 45%.",
+        baseRatC: "Strategy C harnesses the short summer fallow window with 65-day Mung Bean before planting high-profit Mustard, generating dual cashflow while naturally biofumigating.",
+        waterA: "650 mm/yr", waterB: "380 mm/yr (-42%)", waterC: "580 mm/yr (-11%)",
+        nA: "+65 kg N/ha credit", nB: "+40 kg N/ha credit", nC: "+55 kg N/ha credit",
+        pestA: "92% Nematode break", pestB: "88% Pest break", pestC: "96% Pathogen biofumigation",
+        somA: "+0.32% organic carbon", somB: "+0.20% organic carbon", somC: "+0.28% organic carbon",
+        prosA: ["Supplies substantial biological nitrogen reducing synthetic urea costs by 35%", "Fractures plow pans naturally", "High grain harvest in cycle year 3"],
+        consA: ["Chickpea sensitive to waterlogging during flower initiation", "Requires Rhizobium seed inoculation"],
+        prosB: ["Saves 35-45% irrigation water under tubewell rationing", "Exceptional heat tolerance >40°C", "Minimal synthetic pesticide requirement"],
+        consB: ["Requires local market linkage for millet grain and stover", "Careful seedbed moisture needed at germination"],
+        prosC: ["Generates quick pulse cash in 65 days", "Mustard suppresses soilborne verticillium wilt", "High edible oil market price"],
+        consC: ["Mustard requires timely aphid monitoring during flowering", "Fast turnaround required between wheat and mung bean"]
+      },
+      "Mung Bean": {
+        seqA: "Mung Bean ➔ Wheat ➔ Berseem",
+        seqB: "Mung Bean ➔ Pearl Millet ➔ Chickpea",
+        seqC: "Mung Bean ➔ Wheat ➔ Maize",
+        focusA: ["Capitalizes on pulse N-credit for wheat tillering", "Berseem clover delivers +100 kg N/ha and dense root humification", "Restores subterranean microbial ecology"],
+        focusB: ["Ultra low-water drought-hardy succession (<320mm)", "Aquifer protection under canal water rationing", "Extreme heat and drought tolerance in summer months"],
+        focusC: ["High-revenue commercial grain cashflow", "Staple food grain followed by high-biomass feed maize", "Maximizes annual economic return per acre"],
+        baseRatA: "Following summer pulse Mung Bean (which already contributed 45 kg N/ha), Strategy A drills Wheat to exploit topsoil nitrogen, succeeded by multi-cut Berseem clover to inject an additional 100 kg N/ha and build deep organic humus.",
+        baseRatB: "Strategy B pairs Mung Bean with summer Pearl Millet and winter Chickpea, cutting irrigation volume to under 320 mm/yr while maintaining continuous pulse-cereal rotational fertility.",
+        baseRatC: "Strategy C establishes a high-yielding cereal-pulse commercial cycle, transforming legume-enriched fertility into peak wheat yields and commercial feed maize.",
+        waterA: "720 mm/yr", waterB: "320 mm/yr (-55%)", waterC: "680 mm/yr",
+        nA: "+110 kg N/ha credit", nB: "+65 kg N/ha credit", nC: "+50 kg N/ha credit",
+        pestA: "94% Root-knot nematode break", pestB: "92% Pest break", pestC: "89% Weed suppression",
+        somA: "+0.42% organic carbon", somB: "+0.25% organic carbon", somC: "+0.30% organic carbon",
+        prosA: ["Massive combined nitrogen recharge eliminating urea for succeeding crops", "Berseem provides weekly dairy forage sales", "Improves soil crumb structure"],
+        consA: ["Berseem requires regular light irrigation passes", "Higher labor for multiple fodder harvests"],
+        prosB: ["Lowest water consumption profile in Punjab", "Pearl Millet captures subsoil moisture and thrives >42°C", "Protects against canal rotation curtailment"],
+        consB: ["Requires local grain market connection", "Chickpea requires well-drained soil"],
+        prosC: ["Highest gross cash receipts per acre", "Household staple security + commercial grain sales", "Heavy maize stover provides surface mulch"],
+        consC: ["Maize demands steady nitrogen topdressing", "Requires reliable irrigation during summer maize tasseling"]
+      },
+      "Cotton": {
+        seqA: "Cotton ➔ Wheat ➔ Chickpea",
+        seqB: "Cotton ➔ Sorghum ➔ Mung Bean",
+        seqC: "Cotton ➔ Mustard ➔ Berseem",
+        focusA: ["Breaks bollworm and whitefly cycles with non-host crops", "Utilizes deep cotton taproot channels for wheat roots", "Chickpea biologically restores 60 kg N/ha depleted by cotton"],
+        focusB: ["Low-water C4 Sorghum buffers cotton water extraction", "Rapid summer Mung Bean covers fallow window", "Guards against canal rationing in arid cotton belt"],
+        focusC: ["Biofumigant mustard suppresses cotton verticillium wilt", "Multi-cut berseem forage provides weekly dairy cash", "Insulates farm revenue against volatile lint markets"],
+        baseRatA: "Cotton cultivation severely exhausts soil nitrogen and harbors pink bollworm pupae. Strategy A breaks pest life cycles with zero-till Wheat and Chickpea, restoring 60 kg N/ha and subsoil crumb aeration.",
+        baseRatB: "Cotton extracts over 750 mm of irrigation in hot arid belts. Strategy B succeeds with Sorghum and Mung Bean, reducing water demand by 42% and keeping soil covered.",
+        baseRatC: "Strategy C utilizes mustard glucosinolates to cleanse soilborne fungal pathogens, followed by berseem clover to generate dependable livestock cashflow.",
+        waterA: "690 mm/yr", waterB: "460 mm/yr (-38%)", waterC: "720 mm/yr",
+        nA: "+60 kg N/ha credit", nB: "+45 kg N/ha credit", nC: "+90 kg N/ha credit",
+        pestA: "95% Pink bollworm break", pestB: "89% Whitefly break", pestC: "97% Wilt biofumigation",
+        somA: "+0.32% organic carbon", somB: "+0.25% organic carbon", somC: "+0.38% organic carbon",
+        prosA: ["Breaks pink bollworm lifecycle completely", "Wheat zero-drilled into cotton stubble saves fuel and time", "Chickpea recharges subsoil N"],
+        consA: ["Requires timely shredding of cotton stalks", "Chickpea requires well-drained seedbed"],
+        prosB: ["Saves 40% irrigation water in canal-stressed cotton zones", "Sorghum tolerates >42°C heat waves", "Mung bean enriches soil in 65 days"],
+        consB: ["Sorghum stover requires shredding before wheat", "Millet/sorghum market pricing fluctuates"],
+        prosC: ["Mustard biofumigation eliminates root rot inoculum", "Weekly cashflow from berseem fodder sales", "Restores organic humus"],
+        consC: ["Mustard requires timely planting immediately post-cotton harvest", "Berseem requires consistent canal turns"]
+      },
+      "Rice": {
+        seqA: "Rice ➔ Chickpea ➔ Sorghum",
+        seqB: "Rice ➔ Lentils ➔ Pearl Millet",
+        seqC: "Rice ➔ Berseem ➔ Wheat",
+        focusA: ["Alleviates dense plow pan caused by flooded puddling", "Chickpea taproot restores aerobic soil ecology", "Sorghum extracts subsoil salts and fractures hardpan"],
+        focusB: ["Counterbalances rice's 1,200mm water footprint", "Lentils zero-tilled directly on residual moisture", "Pearl Millet cuts summer irrigation by 65%"],
+        focusC: ["Relay sowing Berseem directly into standing rice stubble", "Supplies 4-6 cuttings of high-protein forage", "Prepares high-fertility friable bed for wheat"],
+        baseRatA: "Flooded paddy puddling creates dense anaerobic hardpans. Strategy A introduces deep-rooting Chickpea and Sorghum to naturally de-compact the soil profile and re-establish aerobic microbial respiration.",
+        baseRatB: "Rice depletes regional groundwater tables. Strategy B succeeds with Lentils (relay seeded without pre-irrigation) and Pearl Millet, saving over 60% water to halt aquifer drawdown.",
+        baseRatC: "Strategy C leverages high residual soil moisture post-paddy to broadcast relay Berseem without tillage, delivering 5 forage cuttings before establishing high-yield spring wheat.",
+        waterA: "720 mm/yr (-40%)", waterB: "440 mm/yr (-63%)", waterC: "860 mm/yr (-28%)",
+        nA: "+55 kg N/ha credit", nB: "+45 kg N/ha credit", nC: "+100 kg N/ha credit",
+        pestA: "94% Stem borer break", pestB: "90% Blast break", pestC: "93% Paddy weed suppression",
+        somA: "+0.35% organic carbon", somB: "+0.22% organic carbon", somC: "+0.45% organic carbon",
+        prosA: ["De-compacts puddle hardpan without subsoiler fuel cost", "Restores aerobic soil microbes", "Reconditions soil porosity"],
+        consA: ["Chickpea vulnerable to standing water; requires furrow ridges", "Field must drain completely before chickpea seeding"],
+        prosB: ["Massive 60%+ irrigation water savings", "Zero-till lentils require zero pre-sowing irrigation", "Pearl millet thrives in summer heat"],
+        consB: ["Lentils require seed inoculation with Rhizobium leguminosarum", "Weed control needed in zero-till stubble"],
+        prosC: ["Zero tillage fuel savings with relay berseem", "Produces premium dairy livestock feed", "Restores high soil nitrogen balance"],
+        consC: ["Requires precise broadcast timing into standing paddy 5-7 days before harvest", "Berseem requires winter irrigation passes"]
+      },
+      "Sugarcane": {
+        seqA: "Sugarcane ➔ Berseem ➔ Wheat",
+        seqB: "Sugarcane ➔ Chickpea ➔ Sorghum",
+        seqC: "Sugarcane ➔ Mung Bean ➔ Mustard",
+        focusA: ["De-compacts soil crushed by heavy cane transport wagons", "Berseem clover fixes 95 kg N/ha in exhausted root horizons", "Restores friable crumb structure for wheat"],
+        focusB: ["Drastically cuts sugarcane's 1,400mm water footprint", "Chickpea and Sorghum require 60% less water than cane ratoon", "Protects subsoil aquifer from severe depletion"],
+        focusC: ["Fast summer Mung Bean breaks red rot fungal cycles", "Mustard glucosinolates biofumigate against soil nematodes", "Diversified oilseed and pulse income cushions cashflow"],
+        baseRatA: "Heavy sugarcane transport and continuous ratoon cropping severely compress the root horizon and deplete nitrogen. Strategy A establishes Berseem clover to inject 95 kg N/ha and de-compact soil before wheat.",
+        baseRatB: "Sugarcane is the heaviest water-consuming crop in Pakistan (1,400 mm). Strategy B halts aquifer depletion by succeeding with low-water Chickpea and Sorghum, cutting irrigation volume by 58%.",
+        baseRatC: "Strategy C breaks persistent sugarcane red rot (Colletotrichum falcatum) and root nematodes using biofumigant Mustard and summer Mung Bean, restoring soil vitality.",
+        waterA: "1,050 mm/yr (-25%)", waterB: "520 mm/yr (-63%)", waterC: "680 mm/yr (-51%)",
+        nA: "+95 kg N/ha credit", nB: "+50 kg N/ha credit", nC: "+55 kg N/ha credit",
+        pestA: "96% Nematode break", pestB: "91% Borer break", pestC: "98% Red rot biofumigation",
+        somA: "+0.40% organic carbon", somB: "+0.22% organic carbon", somC: "+0.30% organic carbon",
+        prosA: ["Breaks heavy cane harvesting axle compaction", "Replenishes depleted nitrogen reserves biologically", "Produces high-value winter livestock feed"],
+        consA: ["Requires deep stubble plowing after cane harvest", "Berseem needs regular watering passes"],
+        prosB: ["Cuts farm water extraction by nearly two-thirds", "Restores tubewell groundwater levels", "Low input cost succession"],
+        consB: ["Requires cane stubble clearing before chickpea drilling", "Lower gross biomass than cane ratoon"],
+        prosC: ["Eliminates red rot pathogen reservoirs", "Quick pulse and oilseed revenue", "High market demand for mustard oil and mung dal"],
+        consC: ["Mustard requires timely sowing post-cane harvest", "Fast turnaround needed between cycles"]
+      },
+      "Maize": {
+        seqA: "Maize ➔ Berseem ➔ Wheat",
+        seqB: "Maize ➔ Chickpea ➔ Sorghum",
+        seqC: "Maize ➔ Soybean ➔ Mustard",
+        focusA: ["Berseem biological nitrogen credit (+100 kg N/ha)", "Soil organic matter replenishment from maize stover", "Wheat yield optimization in spring"],
+        focusB: ["Water-saving pulse-cereal succession", "Drought resilience under tubewell restrictions", "Input cost reduction"],
+        focusC: ["Oilseed-protein diversification", "Glucosinolate biofumigation against stalk rot", "Premium commercial market prices"],
+        baseRatA: "Heavy nutrient feeder Maize depletes macro-nutrients rapidly. Strategy A places multi-cut Berseem clover to inject 100 kg N/ha directly into maize residue before high-yield spring wheat.",
+        baseRatB: "Strategy B minimizes input costs and pumping volume by alternating Maize with deep-rooted Chickpea and heat-resilient Sorghum, reducing overall irrigation demand by 38%.",
+        baseRatC: "Strategy C integrates high-protein edible Soybean and winter Mustard, delivering oilseed cashflow and biofumigating soil against Fusarium stalk rot.",
+        waterA: "740 mm/yr", waterB: "480 mm/yr (-35%)", waterC: "620 mm/yr",
+        nA: "+100 kg N/ha credit", nB: "+55 kg N/ha credit", nC: "+65 kg N/ha credit",
+        pestA: "93% Armyworm break", pestB: "89% Borer break", pestC: "96% Stalk rot biofumigation",
+        somA: "+0.42% organic carbon", somB: "+0.24% organic carbon", somC: "+0.32% organic carbon",
+        prosA: ["Restores nitrogen balance depleted by commercial hybrid maize", "Heavy forage biomass production", "Prepares pristine tilth for wheat"],
+        consA: ["Berseem requires frequent irrigation turns", "High labor during fodder cutting"],
+        prosB: ["Saves 35-40% water vs double maize cropping", "Tolerates hot dry spells well", "Low fertilizer expenditure"],
+        consB: ["Requires market outlet for sorghum grain", "Chickpea vulnerable to high salinity"],
+        prosC: ["Captures high soybean oilseed prices", "Mustard suppresses soilborne pathogens", "Diversified harvest calendar"],
+        consC: ["Soybean requires timely pod borer scouting", "Mustard requires timely aphid protection"]
+      },
+      "Chickpea": {
+        seqA: "Chickpea ➔ Maize ➔ Wheat",
+        seqB: "Chickpea ➔ Pearl Millet ➔ Lentils",
+        seqC: "Chickpea ➔ Sorghum ➔ Mustard",
+        focusA: ["Capitalizes on legume N-credit for heavy maize feeding", "Deep taproot channels aerate soil for succeeding wheat", "Balanced grain and cashflow cycle"],
+        focusB: ["Ultra low-water drought-hardy sequence (<320 mm)", "Dual-pulse pulse cycle fixing >110 kg N/ha total", "Maximized aquifer conservation in rainfed Thal/Barani"],
+        focusC: ["Drought-tolerant C4 fodder followed by biofumigant oilseed", "Glucosinolate suppression of chickpea fusarium wilt", "Cushions against erratic monsoon rainfall"],
+        baseRatA: "Chickpea biologically fixes 65 kg N/ha and leaves porous root channels. Strategy A immediately drills Maize to absorb this organic nitrogen, followed by Wheat for staple food security.",
+        baseRatB: "In water-stressed rainfed or tubewell-rationed tracts, Strategy B combines Chickpea with summer Pearl Millet and winter Lentils, keeping total annual irrigation below 320 mm.",
+        baseRatC: "Strategy C establishes Sorghum to handle extreme summer heat, followed by Mustard whose root exudates naturally biofumigate Fusarium wilt (Fusarium oxysporum f. sp. ciceris).",
+        waterA: "640 mm/yr", waterB: "310 mm/yr (-52%)", waterC: "410 mm/yr (-36%)",
+        nA: "+65 kg N/ha credit", nB: "+115 kg N/ha credit", nC: "+60 kg N/ha credit",
+        pestA: "90% Pod borer break", pestB: "94% Soilborne pathogen break", pestC: "98% Fusarium wilt biofumigation",
+        somA: "+0.28% organic carbon", somB: "+0.22% organic carbon", somC: "+0.26% organic carbon",
+        prosA: ["Translates legume nitrogen directly into high maize tonnage", "Deep taproot subsoil aeration", "Reliable cash return"],
+        consA: ["Maize requires summer irrigation stability", "Fall armyworm monitoring needed in maize"],
+        prosB: ["Survives on minimal irrigation or residual moisture", "Dual legume nitrogen boost", "Safeguards against severe drought"],
+        consB: ["Lower biomass production than maize", "Millet grain market pricing fluctuates"],
+        prosC: ["Mustard biofumigation eliminates wilt spores", "High oilseed value", "Sorghum produces dependable livestock stover"],
+        consC: ["Mustard requires timely sowing in October", "Sorghum allelopathy requires nitrogen topdress"]
+      },
+      "Lentils": {
+        seqA: "Lentils ➔ Maize ➔ Wheat",
+        seqB: "Lentils ➔ Pearl Millet ➔ Chickpea",
+        seqC: "Lentils ➔ Sorghum ➔ Mustard",
+        focusA: ["Exploits early pulse harvest for timely summer maize", "Enriches topsoil with +50 kg N/ha biological nitrogen", "High cereal grain cash receipts"],
+        focusB: ["Extremely low water demand profile (<300 mm)", "Resilient against heat waves and dry spells", "Continuous legume soil regeneration"],
+        focusC: ["Soil sanitation through brassica biofumigation", "Stover and oilseed dual income stream", "Drought buffer in arid command zones"],
+        baseRatA: "Lentils mature early (105-115 days) and enrich topsoil nitrogen. Strategy A utilizes this early window to plant high-biomass summer Maize, followed by high-yielding Wheat.",
+        baseRatB: "Strategy B pairs short-duration Lentils with drought-tolerant Pearl Millet and winter Chickpea, slashing farm irrigation pumping by over 50% while sustaining pulse nitrogen fixation.",
+        baseRatC: "Strategy C harnesses Sorghum for heat-resilient fodder followed by biofumigant Mustard, clearing fungal pathogens and stabilizing revenue against climate shocks.",
+        waterA: "620 mm/yr", waterB: "290 mm/yr (-53%)", waterC: "390 mm/yr (-37%)",
+        nA: "+50 kg N/ha credit", nB: "+105 kg N/ha credit", nC: "+50 kg N/ha credit",
+        pestA: "91% Weed suppression", pestB: "93% Root pathogen break", pestC: "97% Biofumigant sanitation",
+        somA: "+0.26% organic carbon", somB: "+0.20% organic carbon", somC: "+0.25% organic carbon",
+        prosA: ["Early harvest facilitates optimal maize seeding window", "Supplies natural nitrogen to succeeding cereal", "High market price for red lentils"],
+        consA: ["Maize requires adequate tubewell water", "Lentils sensitive to herbicide residue"],
+        prosB: ["Exceptional water economy in low-irrigation districts", "High protein human and livestock nutrition", "Minimal fertilizer costs"],
+        consB: ["Requires careful seedbed moisture at germination", "Grain processing requires local dal mills"],
+        prosC: ["Cleanses soil of sclerotinia and root rots", "Good cashflow from mustard seed sales", "Dependable fodder from sorghum"],
+        consC: ["Mustard aphid monitoring required in peak winter", "Fast turnaround required after sorghum"]
+      },
+      "Sorghum": {
+        seqA: "Sorghum ➔ Chickpea ➔ Maize",
+        seqB: "Sorghum ➔ Lentils ➔ Pearl Millet",
+        seqC: "Sorghum ➔ Mustard ➔ Berseem",
+        focusA: ["Breaks sorghum allelopathic depression with nitrogen-fixing pulse", "Chickpea restores depleted soil nitrogen reserves", "Maize provides high grain harvest"],
+        focusB: ["Ultra-low irrigation water consumption (<340 mm)", "Groundwater preservation in depleted canal zones", "Continuous drought and heat resilience >42°C"],
+        focusC: ["Glucosinolate biofumigation cleansing soil fungi", "Berseem clover delivers +100 kg N/ha biological nitrogen", "Stabilizes livestock dairy cashflow"],
+        baseRatA: "Sorghum leaves allelopathic root exudates and draws nitrogen heavily. Strategy A counters this by planting deep-taproot Chickpea to restore 65 kg N/ha, paving the way for vigorous Maize.",
+        baseRatB: "Strategy B pairs C4 Sorghum with winter Lentils and summer Pearl Millet, producing an exceptionally drought-hardy cycle that consumes 45% less water than cereal-cereal rotations.",
+        baseRatC: "Strategy C succeeds Sorghum with biofumigant Mustard and high-protein Berseem clover, rapidly recharging soil microbial health and generating continuous dairy fodder.",
+        waterA: "630 mm/yr", waterB: "340 mm/yr (-46%)", waterC: "660 mm/yr",
+        nA: "+65 kg N/ha credit", nB: "+50 kg N/ha credit", nC: "+95 kg N/ha credit",
+        pestA: "92% Shoot fly break", pestB: "90% General pest break", pestC: "96% Biofumigant sanitation",
+        somA: "+0.30% organic carbon", somB: "+0.22% organic carbon", somC: "+0.38% organic carbon",
+        prosA: ["Neutralizes sorghum stubble allelopathy effectively", "Chickpea re-energizes depleted soil nitrogen", "High cereal yield"],
+        consA: ["Sorghum stubble requires proper incorporation", "Chickpea needs well-drained seedbed"],
+        prosB: ["Minimal irrigation requirements during severe dry spells", "Deep root foraging captures residual nutrients", "Low cash input overhead"],
+        consB: ["Lower gross market revenue than cash crops", "Lentils require weed suppression"],
+        prosC: ["Mustard biofumigates soilborne pathogens", "Weekly cashflow from berseem fodder sales", "Rebuilds organic matter rapidly"],
+        consC: ["Berseem needs regular watering passes", "Fast harvest turnaround required"]
+      },
+      "Berseem": {
+        seqA: "Berseem ➔ Maize ➔ Wheat",
+        seqB: "Berseem ➔ Sorghum ➔ Chickpea",
+        seqC: "Berseem ➔ Cotton ➔ Mustard",
+        focusA: ["Exploits massive +110 kg N/ha clover credit for commercial maize", "Dense root humification maximizes wheat tillering", "Premier soil fertility recharge cycle"],
+        focusB: ["Low-water C4 fodder following clover fertility boost", "Chickpea maintains legume biological fixation", "Protects against canal rotation cutbacks"],
+        focusC: ["Translates clover soil health into premium cotton boll weight", "Biofumigant mustard cleanses cotton soilborne pathogens", "High gross economic output per acre"],
+        baseRatA: "Multi-cut Berseem clover enriches the soil with up to 110 kg N/ha and dense root biomass. Strategy A channels this immense biological fertility into heavy-feeding Maize, followed by high-yield Wheat.",
+        baseRatB: "Strategy B harnesses berseem fertility to grow robust Sorghum on minimal water, succeeded by Chickpea, providing high nutritional value while moderating irrigation consumption.",
+        baseRatC: "Strategy C capitalizes on clover crumb structure to drill high-value Cotton, succeeded by Mustard to biofumigate against cotton root rot and verticillium wilt.",
+        waterA: "760 mm/yr", waterB: "480 mm/yr (-37%)", waterC: "740 mm/yr",
+        nA: "+110 kg N/ha credit", nB: "+70 kg N/ha credit", nC: "+60 kg N/ha credit",
+        pestA: "95% Weed seed suppression", pestB: "92% Pest break", pestC: "96% Root rot biofumigation",
+        somA: "+0.45% organic carbon", somB: "+0.28% organic carbon", somC: "+0.35% organic carbon",
+        prosA: ["Completely eliminates basal nitrogen fertilizer costs for maize", "Greatly enhances soil water holding capacity", "Generates high grain yields"],
+        consA: ["Maize requires adequate irrigation during tasseling", "Fall armyworm scouting required in maize"],
+        prosB: ["Substantially reduces water consumption", "Sorghum thrives on residual clover fertility", "Low synthetic fertilizer requirement"],
+        consB: ["Requires marketing channel for sorghum stover", "Chickpea sensitive to excessive residual moisture"],
+        prosC: ["Boosts cotton boll weight and lint quality", "Mustard suppresses cotton fungal pathogens", "Excellent dual cash receipts"],
+        consC: ["Cotton requires intensive insect pest management", "Mustard requires timely seeding post-cotton harvest"]
+      },
+      "Soybean": {
+        seqA: "Soybean ➔ Wheat ➔ Chickpea",
+        seqB: "Soybean ➔ Pearl Millet ➔ Lentils",
+        seqC: "Soybean ➔ Mustard ➔ Maize",
+        focusA: ["Direct nitrogen credit (+65 kg N/ha) boosting wheat tillering", "Chickpea reinforces legume soil rejuvenation", "Dual grain staple security and cashflow"],
+        focusB: ["Water-conscious oilseed-cereal-pulse cycle (<360 mm)", "Groundwater preservation in tubewell-dependent zones", "High thermal tolerance during summer months"],
+        focusC: ["Dual oilseed cash income (soybean oil + mustard oil)", "Glucosinolate biofumigation against soilborne fungi", "High-biomass maize completing rotational cycle"],
+        baseRatA: "Soybean enriches the root zone with 65 kg N/ha. Strategy A exploits this fertility with zero-till Wheat, followed by Chickpea to sustain subterranean nitrogen levels without heavy urea costs.",
+        baseRatB: "Strategy B alternates Soybean with drought-hardy Pearl Millet and winter Lentils, reducing irrigation water requirements by 42% while providing balanced protein and oil output.",
+        baseRatC: "Strategy C maximizes oilseed revenue by succeeding Soybean with winter Mustard, delivering natural biofumigation before transitioning into high-biomass commercial Maize.",
+        waterA: "660 mm/yr", waterB: "360 mm/yr (-45%)", waterC: "640 mm/yr",
+        nA: "+65 kg N/ha credit", nB: "+55 kg N/ha credit", nC: "+60 kg N/ha credit",
+        pestA: "93% Nematode break", pestB: "91% Pest break", pestC: "97% Biofumigant sanitation",
+        somA: "+0.32% organic carbon", somB: "+0.22% organic carbon", somC: "+0.30% organic carbon",
+        prosA: ["Supplies substantial biological nitrogen to wheat", "Reduces synthetic fertilizer outlay", "High international edible oil demand"],
+        consA: ["Soybean requires Rhizobium japonicum inoculation", "Chickpea requires furrow beds in heavy soils"],
+        prosB: ["Exceptional water resilience under tubewell restrictions", "Pearl millet handles >40°C heat effortlessly", "Saves pumping diesel/electricity"],
+        consB: ["Requires local poultry/oilseed buyer connections", "Lentils require careful weed management"],
+        prosC: ["Top financial return from dual oilseed production", "Mustard root exudates suppress nematodes", "Heavy maize stover recycles organic matter"],
+        consC: ["Mustard aphid spraying may be required in January", "Maize requires steady irrigation during summer"]
+      },
+      "Mustard": {
+        seqA: "Mustard ➔ Maize ➔ Wheat",
+        seqB: "Mustard ➔ Pearl Millet ➔ Chickpea",
+        seqC: "Mustard ➔ Mung Bean ➔ Berseem",
+        focusA: ["Glucosinolate biofumigation sanitizes soil for maize", "Fractures hardpans and suppresses soilborne nematodes", "Commercial grain yield optimization"],
+        focusB: ["Ultra-low irrigation water footprint (<310 mm)", "Protects depleted aquifers in arid Southern Punjab", "High heat tolerance and resilience against canal rationing"],
+        focusC: ["Rapid pulse-forage fertility restoration cycle", "Berseem clover delivers +100 kg N/ha biological nitrogen", "Stabilizes livestock forage and high-value edible oil receipts"],
+        baseRatA: "Mustard root exudates naturally release isothiocyanates that biofumigate the soil against fungal pathogens and nematodes. Strategy A exploits this pristine seedbed to plant commercial Maize, followed by high-yield Wheat.",
+        baseRatB: "Strategy B creates an exceptionally water-frugal cycle by combining Mustard (200 mm water) with summer Pearl Millet (250 mm) and winter Chickpea, cutting annual pumping by over 50%.",
+        baseRatC: "Strategy C pairs Mustard with 65-day summer Mung Bean and multi-cut Berseem clover, rapidly restoring organic nitrogen and providing continuous dairy cashflow.",
+        waterA: "640 mm/yr", waterB: "300 mm/yr (-53%)", waterC: "680 mm/yr",
+        nA: "+45 kg N/ha credit", nB: "+50 kg N/ha credit", nC: "+110 kg N/ha credit",
+        pestA: "97% Biofumigant sanitation", pestB: "94% Pathogen break", pestC: "98% Nematode & fungal sanitation",
+        somA: "+0.28% organic carbon", somB: "+0.20% organic carbon", somC: "+0.40% organic carbon",
+        prosA: ["Natural soil sanitation eliminates need for chemical soil sterilants", "High market value for edible mustard oil", "Deep taproot breaks subsoil crusts"],
+        consA: ["Maize requires timely nitrogen topdressing", "Mustard requires aphid scouting in winter"],
+        prosB: ["Massive 50%+ irrigation water savings", "Survives harsh heat waves with zero yield crash", "Lowest production expenditure per acre"],
+        consB: ["Requires local market connection for pearl millet", "Chickpea vulnerable to standing water"],
+        prosC: ["Dual legume nitrogen replenishment eliminating synthetic urea", "Steady weekly income from berseem fodder sales", "Improves soil humus structure"],
+        consC: ["Berseem requires frequent light water applications", "Higher labor required for fodder cuttings"]
+      },
+      "Pearl Millet": {
+        seqA: "Pearl Millet ➔ Chickpea ➔ Maize",
+        seqB: "Pearl Millet ➔ Lentils ➔ Sorghum",
+        seqC: "Pearl Millet ➔ Mustard ➔ Berseem",
+        focusA: ["Deep rooting extracts subsoil moisture and de-compacts hardpan", "Chickpea biological nitrogen credit (+65 kg N/ha)", "High-biomass maize completing rotational cycle"],
+        focusB: ["World-class drought resilience under tubewell restrictions (<290 mm)", "Groundwater preservation in hyper-arid zones", "Zero synthetic pesticide dependency"],
+        focusC: ["Biofumigant mustard suppresses soilborne pathogens", "Berseem clover fixes 100 kg N/ha in exhausted root horizon", "High-value dairy fodder and edible oil cashflow"],
+        baseRatA: "Pearl Millet possesses deep, fibrous roots that scavenge subsoil nutrients and withstand >42°C heat. Strategy A succeeds with Chickpea to biologically fix 65 kg N/ha before establishing high-yield Maize.",
+        baseRatB: "Strategy B delivers Pakistan's most water-efficient rotation, pairing Pearl Millet with winter Lentils and Sorghum, using under 290 mm of seasonal irrigation to safeguard sinking aquifers.",
+        baseRatC: "Strategy C follows Pearl Millet with biofumigant Mustard and high-protein Berseem clover, restoring soil microbial health and generating continuous weekly fodder cashflow.",
+        waterA: "610 mm/yr", waterB: "290 mm/yr (-52%)", waterC: "650 mm/yr",
+        nA: "+65 kg N/ha credit", nB: "+50 kg N/ha credit", nC: "+95 kg N/ha credit",
+        pestA: "91% Borer break", pestB: "93% General pest break", pestC: "97% Biofumigant sanitation",
+        somA: "+0.26% organic carbon", somB: "+0.20% organic carbon", somC: "+0.38% organic carbon",
+        prosA: ["Exceptional heat and moisture stress resilience", "Deep fibrous root system fractures subsoil hardpan", "Chickpea recharges soil nitrogen biologically"],
+        consA: ["Maize requires summer irrigation stability", "Millet requires market linkage for grain and stover"],
+        prosB: ["Lowest water demand rotation in arid command areas", "Survives extreme heat waves with zero yield penalty", "Minimal production cost outlay"],
+        consB: ["Lower gross biomass than commercial cash crops", "Lentils require weed control in standing stubble"],
+        prosC: ["Mustard biofumigates soilborne fungal inoculum", "Weekly cashflow from dairy forage sales", "Rebuilds organic matter rapidly"],
+        consC: ["Berseem requires consistent canal passes", "Mustard requires aphid monitoring during flowering"]
+      }
+    };
+
+    function computePreviewStrategies(crop, soil, ph, priority, irrigation) {
+      const data = CROP_STRATEGIES_PREVIEW[crop] || CROP_STRATEGIES_PREVIEW["Wheat"];
+      
+      const isWaterSavingPriority = priority === "Water conservation" || (priority && priority.toLowerCase().includes("water"));
+      const isSoilHealthPriority = priority === "Soil Health & Nitrogen Fixation" || (priority && priority.toLowerCase().includes("soil"));
+
+      let climA = 88, watA = 85, soilA = 92, priA = 72;
+      let climB = 90, watB = 95, soilB = 82, priB = 95;
+      let climC = 84, watC = 78, soilC = 84, priC = 88;
+
+      if (isWaterSavingPriority) {
+        priB = 98; priA = 75; priC = 70;
+        watB = 96; watA = 80; watC = 74;
+      } else if (isSoilHealthPriority) {
+        priA = 96; priC = 92; priB = 80;
+        soilA = 95; soilC = 90; soilB = 82;
+      }
+
+      // Soil texture modifier
+      let soilMod = `On ${soil} soil, `;
+      if (soil.toLowerCase().includes("sand")) {
+        soilMod += "rapid percolation and low moisture retention make drought-hardy pulses essential to prevent nutrient leaching. ";
+        watB += 3; soilB += 4;
+      } else if (soil.toLowerCase().includes("clay")) {
+        soilMod += "dense structure and slow drainage benefit from deep-taproot crops to fracture plow pans and enhance aeration. ";
+        soilA += 4; watA -= 2;
+      } else {
+        soilMod += "balanced loam structure provides ideal capillary moisture retention for intensive pulse-cereal successions. ";
+        soilA += 2; soilB += 2;
+      }
+
+      // Soil pH modifier
+      let phMod = `At pH ${Number(ph).toFixed(1)}, `;
+      if (ph > 8.0) {
+        phMod += "alkaline conditions cause phosphorus fixation, so legume root organic acids are vital to solubilize locked phosphorus. ";
+      } else if (ph < 6.5) {
+        phMod += "acidic conditions limit nitrogen mineralization, favoring acid-tolerant varieties. ";
+      } else {
+        phMod += "neutral pH maximizes symbiotic Rhizobium nitrogen fixation. ";
+      }
+
+      // Irrigation regime modifier
+      let irrigMod = `Under ${irrigation}, `;
+      if (irrigation.toLowerCase().includes("drip")) {
+        irrigMod += "high water efficiency allows precision fertigation. ";
+      } else if (irrigation.toLowerCase().includes("limited") || irrigation.toLowerCase().includes("tubewell")) {
+        irrigMod += "tubewell groundwater rationing necessitates drought-hardy summer cycles to prevent aquifer depletion. ";
+        watB += 4;
+      } else {
+        irrigMod += "conjunctive canal-groundwater turns provide predictable irrigation windows for rotational crops. ";
+      }
+
+      // Synthesize dynamic rationales
+      const ratA = `${data.baseRatA} ${soilMod}${phMod}${irrigMod}`;
+      const ratB = `${data.baseRatB} ${soilMod}${phMod}${irrigMod}`;
+      const ratC = `${data.baseRatC} ${soilMod}${phMod}${irrigMod}`;
+
+      const scoreA = Math.round(climA * 0.25 + watA * 0.30 + soilA * 0.25 + priA * 0.20);
+      const scoreB = Math.round(climB * 0.25 + watB * 0.30 + soilB * 0.25 + priB * 0.20);
+      const scoreC = Math.round(climC * 0.25 + watC * 0.30 + soilC * 0.25 + priC * 0.20);
+
+      return [
+        {
+          key: "stratA",
+          name: "Strategy A — Soil Improvement",
+          sequence: data.seqA,
+          focusPoints: data.focusA,
+          cardBorder: "border-emerald-300",
+          badgeBg: "bg-emerald-100",
+          badgeText: "text-emerald-800",
+          seqBg: "bg-emerald-50/70",
+          seqBorder: "border-emerald-200",
+          seqText: "text-emerald-900",
+          overallScore: scoreA,
+          climateScore: climA,
+          waterScore: watA,
+          soilScore: soilA,
+          priorityScore: priA,
+          rationale: ratA,
+          waterMetric: data.waterA,
+          nMetric: data.nA,
+          pestMetric: data.pestA,
+          somMetric: data.somA,
+          pros: data.prosA,
+          considerations: data.consA
+        },
+        {
+          key: "stratB",
+          name: "Strategy B — Water Conscious",
+          sequence: data.seqB,
+          focusPoints: data.focusB,
+          cardBorder: "border-blue-400",
+          badgeBg: "bg-blue-100",
+          badgeText: "text-blue-800",
+          seqBg: "bg-blue-50/70",
+          seqBorder: "border-blue-200",
+          seqText: "text-blue-900",
+          overallScore: scoreB,
+          climateScore: climB,
+          waterScore: watB,
+          soilScore: soilB,
+          priorityScore: priB,
+          rationale: ratB,
+          waterMetric: data.waterB,
+          nMetric: data.nB,
+          pestMetric: data.pestB,
+          somMetric: data.somB,
+          pros: data.prosB,
+          considerations: data.consB
+        },
+        {
+          key: "stratC",
+          name: "Strategy C — Diversified Farming",
+          sequence: data.seqC,
+          focusPoints: data.focusC,
+          cardBorder: "border-slate-300",
+          badgeBg: "bg-slate-100",
+          badgeText: "text-slate-800",
+          seqBg: "bg-slate-50/70",
+          seqBorder: "border-slate-200",
+          seqText: "text-slate-900",
+          overallScore: scoreC,
+          climateScore: climC,
+          waterScore: watC,
+          soilScore: soilC,
+          priorityScore: priC,
+          rationale: ratC,
+          waterMetric: data.waterC,
+          nMetric: data.nC,
+          pestMetric: data.pestC,
+          somMetric: data.somC,
+          pros: data.prosC,
+          considerations: data.consC
+        }
+      ];
+    }
     function getRotationForCrop(crop, soil, ph) {
       const curSoil = soil ? (soil.split(' ')[0] || 'Loamy') : (document.getElementById('farm-soil')?.value || 'Loamy');
       const curPh = parseFloat(ph) || parseFloat(document.getElementById('farm-ph')?.value) || 7.5;
@@ -3705,7 +4562,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
         const options2027 = ALL_13_CROPS_LIST.map(c => `<option value="${c}" ${c === f.y2027 ? 'selected' : ''}>${c}</option>`).join('');
         const options2028 = ALL_13_CROPS_LIST.map(c => `<option value="${c}" ${c === f.y2028 ? 'selected' : ''}>${c}</option>`).join('');
 
-        const dynRot = getRotationForCrop(f.y2026, f.soil, f.ph);
+        const dynRot = getRotationForCrop(f.y2026, f.soil, f.ph, curPriority, curIrrig, f.y2027, f.y2028);
         return `
           <tr class="hover:bg-slate-50 transition-colors">
             <td class="py-2.5 px-3 font-bold text-slate-900">${f.id}</td>
@@ -3713,12 +4570,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
             <td class="px-3 text-slate-600">${f.soil}</td>
             <td class="px-3"><span class="px-2 py-0.5 rounded bg-slate-100 font-bold">${f.y2026}</span></td>
             <td class="px-3">
-              <select onchange="updateFieldYearCrop(${i}, 'y2027', this.value)" class="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-300 font-bold text-emerald-800 text-xs shadow-xs focus:ring-1 focus:ring-emerald-500">
+              <select onchange="updateFieldYearCrop(${i}, 'y2027', this.value)" class="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-300 font-bold text-emerald-800 text-xs shadow-xs focus:ring-1 focus:ring-emerald-500 cursor-pointer">
                 ${options2027}
               </select>
             </td>
             <td class="px-3">
-              <select onchange="updateFieldYearCrop(${i}, 'y2028', this.value)" class="px-2 py-1 rounded-md bg-blue-50 border border-blue-300 font-bold text-blue-800 text-xs shadow-xs focus:ring-1 focus:ring-blue-500">
+              <select onchange="updateFieldYearCrop(${i}, 'y2028', this.value)" class="px-2 py-1 rounded-md bg-blue-50 border border-blue-300 font-bold text-blue-800 text-xs shadow-xs focus:ring-1 focus:ring-blue-500 cursor-pointer">
                 ${options2028}
               </select>
             </td>
@@ -3730,7 +4587,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
             <td class="px-3 text-[11px] font-semibold text-slate-600 max-w-[200px] truncate" title="${dynRot.category}">
               ${dynRot.category}
             </td>
-            <td class="px-3 text-right font-black text-slate-900">${topFarmRot.score || 93}/100</td>
+            <td class="px-3 text-right font-black text-slate-900">${dynRot.score}/100</td>
           </tr>
         `;
       }).join('');
@@ -4709,6 +5566,16 @@ function renderDynamicRotationStrategies() {
               </div>
             </div>
 
+            <!-- Apply to All Parcels Button -->
+            <button 
+              type="button" 
+              onclick="applyStrategyToAllParcels(${strats.indexOf(strat)})" 
+              class="w-full mt-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              title="Apply this rotation sequence across all field parcels"
+            >
+              <span>⚡ Apply to All Parcels</span>
+            </button>
+
             <!-- View Details Button -->
             <button 
               type="button" 
@@ -4831,6 +5698,30 @@ function renderDynamicRotationStrategies() {
       const costSeverity = `+${pumpingCostSurge}% Cost Surge`;
       const costBarWidth = Math.min(100, pumpingCostSurge);
 
+      // Resolve live farm crops and baseline strategies
+      const dominantCrop = (window.registeredFields && window.registeredFields.length > 0)
+        ? window.registeredFields[0].y2026
+        : ((document.getElementById('farm-crop') && document.getElementById('farm-crop').value) || 'Wheat');
+      const soilType = (document.getElementById('farm-soil') && document.getElementById('farm-soil').value) || 'Loamy';
+      const soilPh = parseFloat(document.getElementById('farm-ph') ? document.getElementById('farm-ph').value : 7.5) || 7.5;
+      const priority = (document.getElementById('farm-priority') && document.getElementById('farm-priority').value) || 'Water conservation';
+      const irrigation = (document.getElementById('farm-irrigation') && document.getElementById('farm-irrigation').value) || 'Limited groundwater';
+
+      const strats = computePreviewStrategies(dominantCrop, soilType, soilPh, priority, irrigation);
+      const baseA = strats[0]?.overallScore || 84;
+      const baseB = strats[1]?.overallScore || 93;
+      const baseC = strats[2]?.overallScore || 78;
+
+      const seqA = strats[0]?.sequence || `${dominantCrop} ➔ Chickpea ➔ Maize`;
+      const seqB = strats[1]?.sequence || `${dominantCrop} ➔ Pearl Millet ➔ Chickpea`;
+      const seqC = strats[2]?.sequence || `${dominantCrop} ➔ Berseem ➔ Maize`;
+
+      // Update Traditional & Resilient inputs in Simulator Top Card
+      const simTradInput = document.getElementById('sim-trad-variety');
+      if (simTradInput) simTradInput.value = `Traditional ${dominantCrop} Monoculture`;
+      const simResilInput = document.getElementById('sim-resil-variety');
+      if (simResilInput) simResilInput.value = seqB;
+
       // Traditional decadal loss
       const stressIndex = (Math.abs(Math.min(0, rain)) / 20.0) * 0.35 + (temp / 2.0) * 0.40 + (Math.abs(water) / 30.0) * 0.45;
       const traditionalLoss2060 = Math.round(16.0 * stressIndex * 10) / 10;
@@ -4867,78 +5758,68 @@ function renderDynamicRotationStrategies() {
 
       const dangerBadge = document.getElementById('sim-danger-badge');
       if (dangerBadge) {
-        if (stressIndex >= 1.5) { dangerBadge.textContent = 'Critical Climate Danger Zone'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-pulse shadow-sm'; }
-        else if (stressIndex >= 0.8) { dangerBadge.textContent = 'High Climate Hazard Warning'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black'; }
-        else { dangerBadge.textContent = 'Baseline Stable Conditions'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold'; }
+        if (stressIndex >= 1.5) { dangerBadge.textContent = 'Critical Climate Danger Zone'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-xs animate-pulse'; }
+        else if (stressIndex >= 0.8) { dangerBadge.textContent = 'High Climate Hazard Warning'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black text-xs'; }
+        else { dangerBadge.textContent = 'Baseline Stable Conditions'; dangerBadge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs'; }
       }
 
-      // 2. Dynamically Update Side-by-Side SVG Charts
-      const tradDecadalPcts = [0, roundDec(2.5 * stressIndex), roundDec(6.0 * stressIndex), roundDec(11.5 * stressIndex), traditionalLoss2060];
-      const resDecadalPcts = [0, roundDec(0.8 * stressIndex), roundDec(2.2 * stressIndex), roundDec(4.5 * stressIndex), resilientLoss2060];
-      const xs = [80, 160, 240, 320, 400];
+      // Update decadal chart loss labels
+      const l2030t = document.getElementById('lbl-2030-trad');
+      if (l2030t) l2030t.textContent = `-${(2.5 * stressIndex).toFixed(1)}%`;
+      const l2040t = document.getElementById('lbl-2040-trad');
+      if (l2040t) l2040t.textContent = `-${(6.0 * stressIndex).toFixed(1)}%`;
+      const l2050t = document.getElementById('lbl-2050-trad');
+      if (l2050t) l2050t.textContent = `-${(11.5 * stressIndex).toFixed(1)}%`;
+      const l2060t = document.getElementById('lbl-2060-trad');
+      if (l2060t) l2060t.textContent = `-${traditionalLoss2060}%`;
 
-      // Chart 1 (Decadal Loss %)
-      const tradPts = xs.map((x, i) => `${x},${Math.min(170, Math.round(20 + tradDecadalPcts[i] * 7.0))}`).join(' ');
-      const resPts = xs.map((x, i) => `${x},${Math.min(170, Math.round(20 + resDecadalPcts[i] * 7.0))}`).join(' ');
+      const l2030r = document.getElementById('lbl-2030-res');
+      if (l2030r) l2030r.textContent = `-${(0.8 * stressIndex).toFixed(1)}%`;
+      const l2040r = document.getElementById('lbl-2040-res');
+      if (l2040r) l2040r.textContent = `-${(2.2 * stressIndex).toFixed(1)}%`;
+      const l2050r = document.getElementById('lbl-2050-res');
+      if (l2050r) l2050r.textContent = `-${(4.5 * stressIndex).toFixed(1)}%`;
+      const l2060r = document.getElementById('lbl-2060-res');
+      if (l2060r) l2060r.textContent = `-${resilientLoss2060}%`;
 
-      const polyTrad = document.getElementById('polyline-traditional-yield');
-      if (polyTrad) polyTrad.setAttribute('points', tradPts);
-      const polyRes = document.getElementById('polyline-resilient-yield');
-      if (polyRes) polyRes.setAttribute('points', resPts);
+      // Update Yield kg/10ha labels
+      const baseTradKg = 17000;
+      const baseResKg = 19500;
+      const y2060t = document.getElementById('ykg-2060-trad');
+      if (y2060t) y2060t.textContent = `${Math.round(baseTradKg * (1 - traditionalLoss2060 / 100)).toLocaleString()} kg`;
+      const y2060r = document.getElementById('ykg-2060-res');
+      if (y2060r) y2060r.textContent = `${Math.round(baseResKg * (1 - resilientLoss2060 / 100)).toLocaleString()} kg`;
 
-      const circTrad = document.getElementById('circle-traditional-end');
-      if (circTrad) { circTrad.setAttribute('cy', Math.min(170, Math.round(20 + traditionalLoss2060 * 7.0))); }
-      const circRes = document.getElementById('circle-resilient-end');
-      if (circRes) { circRes.setAttribute('cy', Math.min(170, Math.round(20 + resilientLoss2060 * 7.0))); }
+      // Draw interactive SVG charts
+      drawDecadalCurves(stressIndex, traditionalLoss2060, resilientLoss2060);
+      drawProjectedYieldCurves(stressIndex, traditionalLoss2060, resilientLoss2060);
 
-      const txtCh1Trad = document.getElementById('text-chart1-traditional-legend');
-      if (txtCh1Trad) txtCh1Trad.textContent = `Traditional: -${traditionalLoss2060}% (${traditionalLoss2060 > 15 ? 'Severe Loss' : 'Yield Decline'})`;
-      const txtCh1Res = document.getElementById('text-chart1-resilient-legend');
-      if (txtCh1Res) txtCh1Res.textContent = `Climate Resilient: -${resilientLoss2060}% (Protected)`;
+      // Dynamic Suitability Score Calculations based on baseline scores
+      const scoreA = Math.max(50, Math.min(100, Math.round(baseA - Math.abs(rain) * 0.45 - temp * 3.5 - Math.abs(water) * 0.40)));
+      const scoreB = Math.max(50, Math.min(100, Math.round(baseB + Math.abs(rain) * 0.20 + (temp > 1.5 ? 2 : 0) + (water < -20 ? 3 : 0))));
+      const scoreC = Math.max(50, Math.min(100, Math.round(baseC - Math.abs(rain) * 0.35 - temp * 2.8 - Math.abs(water) * 0.50)));
 
-      // Chart 2 (Biological Yield kg / 10 ha)
-      const baseResKg = 18800;
-      const baseTradKg = 16950;
-      const tradKgVals = tradDecadalPcts.map(p => Math.round(baseTradKg * (1 - p / 100)));
-      const resKgVals = resDecadalPcts.map(p => Math.round(baseResKg * (1 - p / 100)));
-
-      const tradKgPts = xs.map((x, i) => `${x},${Math.min(170, Math.max(20, Math.round(20 + ((20000 - tradKgVals[i]) / 8000) * 150)))}`).join(' ');
-      const resKgPts = xs.map((x, i) => `${x},${Math.min(170, Math.max(20, Math.round(20 + ((20000 - resKgVals[i]) / 8000) * 150)))}`).join(' ');
-
-      const polyTradKg = document.getElementById('polyline-traditional-kg');
-      if (polyTradKg) polyTradKg.setAttribute('points', tradKgPts);
-      const polyResKg = document.getElementById('polyline-resilient-kg');
-      if (polyResKg) polyResKg.setAttribute('points', resKgPts);
-
-      const endTradKgY = Math.min(170, Math.max(20, Math.round(20 + ((20000 - tradKgVals[4]) / 8000) * 150)));
-      const endResKgY = Math.min(170, Math.max(20, Math.round(20 + ((20000 - resKgVals[4]) / 8000) * 150)));
-
-      const circTradKg = document.getElementById('circle-traditional-kg-end');
-      if (circTradKg) circTradKg.setAttribute('cy', endTradKgY);
-      const circResKg = document.getElementById('circle-resilient-kg-end');
-      if (circResKg) circResKg.setAttribute('cy', endResKgY);
-
-      const txtCh2Res = document.getElementById('text-chart2-resilient-legend');
-      if (txtCh2Res) txtCh2Res.textContent = `Climate Resilient: ${(resKgVals[4]/1000).toFixed(2)}k kg (Stable)`;
-      const txtCh2Trad = document.getElementById('text-chart2-traditional-legend');
-      if (txtCh2Trad) txtCh2Trad.textContent = `Traditional: ${(tradKgVals[4]/1000).toFixed(2)}k kg (-${(baseTradKg - tradKgVals[4]).toLocaleString()} kg Loss)`;
-
-      // 3. Recalculate Strategy Suitability Scores
-      const baseA = 89;
-      const baseB = 82;
-      const baseC = 76;
-
-      const deltaA = Math.round(-temp * 4.2 + rain * 0.28 + water * 0.38);
-      const deltaB = Math.round(-temp * 0.8 + rain * 0.08 + water * 0.10 + (temp >= 1.5 || water <= -20 ? 6 : 0));
-      const deltaC = Math.round(-temp * 3.4 + rain * 0.22 + water * 0.44);
-
-      const scoreA = Math.max(45, Math.min(96, baseA + deltaA));
-      const scoreB = Math.max(50, Math.min(97, baseB + deltaB));
-      const scoreC = Math.max(40, Math.min(92, baseC + deltaC));
+      const deltaA = scoreA - baseA;
+      const deltaB = scoreB - baseB;
+      const deltaC = scoreC - baseC;
 
       const isBWinner = scoreB >= scoreA && scoreB >= scoreC;
 
-      // Update Strategy Cards
+      // Update card labels and sequence text dynamically
+      const seqElA = document.getElementById('sim-seq-a');
+      if (seqElA) seqElA.textContent = seqA;
+      const seqElB = document.getElementById('sim-seq-b');
+      if (seqElB) seqElB.textContent = seqB;
+      const seqElC = document.getElementById('sim-seq-c');
+      if (seqElC) seqElC.textContent = seqC;
+
+      const baseScoreA = document.getElementById('base-score-a');
+      if (baseScoreA) baseScoreA.textContent = baseA;
+      const baseScoreB = document.getElementById('base-score-b');
+      if (baseScoreB) baseScoreB.textContent = baseB;
+      const baseScoreC = document.getElementById('base-score-c');
+      if (baseScoreC) baseScoreC.textContent = baseC;
+
       const resA = document.getElementById('res-a');
       if (resA) resA.textContent = scoreA;
       const resB = document.getElementById('res-b');
@@ -4990,9 +5871,9 @@ function renderDynamicRotationStrategies() {
       const insText = document.getElementById('sim-insight-text');
       if (insText) {
         if (isBWinner) {
-          insText.innerHTML = `Under your selected climate stress scenario (<strong>Rainfall: ${rain > 0 ? '+' : ''}${rain}%, Temperature: +${temp.toFixed(1)}°C, Irrigation: ${water}%</strong>), <strong>Strategy B (Wheat → Pearl Millet → Chickpea)</strong> climbs to <strong>${scoreB} points</strong> and takes 1st place! Pearl Millet requires only 280 mm water (49% less than hybrid maize) and tolerates ambient heat up to 44°C, preventing pollination failure and ensuring feed security under canal cuts.`;
+          insText.innerHTML = `Under your selected climate stress scenario (<strong>Rainfall: ${rain > 0 ? '+' : ''}${rain}%, Temperature: +${temp.toFixed(1)}°C, Irrigation: ${water}%</strong>), <strong>Strategy B (${seqB})</strong> climbs to <strong>${scoreB} points</strong> and takes 1st place! It requires significantly less water than traditional rotations and tolerates ambient heat up to 44°C, preventing pollination failure and ensuring food/feed security under canal cuts.`;
         } else {
-          insText.innerHTML = `Under baseline conditions (<strong>Rainfall: ${rain > 0 ? '+' : ''}${rain}%, Temperature: +${temp.toFixed(1)}°C, Irrigation: ${water}%</strong>), <strong>Strategy A (Wheat → Chickpea → Maize)</strong> leads with <strong>${scoreA} points</strong>, delivering balanced soil nitrogen recharge and maximum commercial yield potential.`;
+          insText.innerHTML = `Under baseline conditions (<strong>Rainfall: ${rain > 0 ? '+' : ''}${rain}%, Temperature: +${temp.toFixed(1)}°C, Irrigation: ${water}%</strong>), <strong>Strategy A (${seqA})</strong> leads with <strong>${scoreA} points</strong>, delivering balanced soil nitrogen recharge and maximum commercial yield potential.`;
         }
       }
 
@@ -5008,7 +5889,7 @@ function renderDynamicRotationStrategies() {
         deltaB: deltaB,
         deltaC: deltaC,
         isBWinner: isBWinner,
-        winnerName: isBWinner ? 'Strategy B (Wheat → Pearl Millet → Chickpea)' : 'Strategy A (Wheat → Chickpea → Maize)',
+        winnerName: isBWinner ? `Strategy B (${seqB})` : `Strategy A (${seqA})`,
         heatSeverity: heatSeverity,
         waterDeficitMm: waterDeficitMm,
         pumpingCostSurge: pumpingCostSurge,
@@ -5019,8 +5900,7 @@ function renderDynamicRotationStrategies() {
           : `Under baseline climate, Strategy A continues to lead with ${scoreA}/100.`
       };
     }
-
-        function sendManualMsg() {
+function sendManualMsg() {
       const input = document.getElementById('user-input');
       const val = input.value.trim();
       if (!val) return;
@@ -5370,7 +6250,7 @@ function renderDynamicRotationStrategies() {
       const tbody = document.getElementById('dash-parcels-table-body');
       if (tbody) {
         tbody.innerHTML = fields.map(f => {
-          const dynRot = getRotationForCrop(f.y2026, f.soil || soilType, f.ph || soilPh);
+          const dynRot = getRotationForCrop(f.y2026, f.soil || soilType, f.ph || soilPh, priority, irrigation, f.y2027, f.y2028);
           return `
             <tr class="hover:bg-slate-50 transition-colors">
               <td class="py-2.5 px-3 font-bold text-slate-900">${f.id}</td>
@@ -5379,7 +6259,7 @@ function renderDynamicRotationStrategies() {
               <td class="px-3"><span class="px-2 py-0.5 rounded bg-slate-100 font-bold">${f.y2026}</span></td>
               <td class="px-3 font-bold text-emerald-700">${f.y2027 || dynRot.y2027}</td>
               <td class="px-3 font-bold text-blue-700">${f.y2028 || dynRot.y2028}</td>
-              <td class="px-3 text-right font-black text-slate-900">${winner.overallScore}/100</td>
+              <td class="px-3 text-right font-black text-slate-900">${dynRot.score}/100</td>
             </tr>
           `;
         }).join('');

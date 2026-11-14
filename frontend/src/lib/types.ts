@@ -58,10 +58,13 @@ export interface NASADataResponse {
     month: string;
     month_code: string;
     temp: number;
+    temp_max?: number;
+    temp_min?: number;
     rain: number;
     radiation: number;
     baselineTrend: number;
   }>;
+  monthly?: any[];
   daily_data?: DailyWeather[];
 }
 
